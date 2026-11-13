@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b2b">
+  <meta name="description" content="Formulário de controle de ponto para operações de transporte.">
+  <title>Controle de Ponto | Operações</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Controle de Ponto - início">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M8 4.5h8a2 2 0 0 1 2 2v13H6v-13a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M9 4.5V3h6v1.5M9 10h6M9 14h6M9 18h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <strong>CONTROLE<span> DE PONTO</span></strong>
+          <small>Gestão operacional de transporte</small>
+        </span>
+      </a>
+      <div class="topbar-meta">
+        <span class="status-dot"></span>
+        <span>Ambiente de lançamento</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">OPERAÇÕES <span>/</span> REGISTROS</p>
+          <h1>Controle de ponto</h1>
+          <p class="page-description">Cadastre e acompanhe os apontamentos de jornada dos colaboradores.</p>
+        </div>
+        <div class="today-chip">
+          <span class="today-icon" aria-hidden="true">◷</span>
+          <span id="todayLabel">Carregando data...</span>
+        </div>
+      </section>
+
+      <section class="stats-grid" aria-label="Resumo dos lançamentos">
+        <article class="stat-card">
+          <span class="stat-label">Lançamentos salvos</span>
+          <div class="stat-value" id="totalRecords">0</div>
+          <span class="stat-note">Registros neste navegador</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Lançamentos de hoje</span>
+          <div class="stat-value" id="todayRecords">0</div>
+          <span class="stat-note">Considerando a data inicial</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Veículos registrados</span>
+          <div class="stat-value" id="vehicleCount">0</div>
+          <span class="stat-note">Placas distintas no histórico</span>
+        </article>
+      </section>
+
+      <section class="panel form-panel">
+        <div class="panel-heading">
+          <div class="panel-title-wrap">
+            <span class="section-index">01</span>
+            <div>
+              <h2>Novo lançamento</h2>
+              <p>Preencha os dados abaixo para registrar o ponto.</p>
+            </div>
+          </div>
+          <span class="required-note"><span>*</span> Campos obrigatórios</span>
+        </div>
+
+        <form id="timeForm" novalidate>
+          <div class="form-section">
+            <div class="form-section-heading">
+              <span class="section-icon" aria-hidden="true">♙</span>
+              <h3>Identificação do colaborador</h3>
+            </div>
+            <div class="form-grid">
+              <div class="field field-span-2">
+                <label for="fullName">Nome completo <span>*</span></label>
+                <input id="fullName" name="fullName" type="text" autocomplete="name" placeholder="Digite o nome completo" maxlength="120" required>
+              </div>
+              <div class="field">
+                <label for="registration">Matrícula <span>*</span></label>
+                <input id="registration" name="registration" type="text" inputmode="text" placeholder="Ex.: 002458" maxlength="30" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-heading">
+              <span class="section-icon" aria-hidden="true">◷</span>
+              <h3>Informações da jornada</h3>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="startDate">Data inicial <span>*</span></label>
+                <input id="startDate" name="startDate" type="date" required>
+              </div>
+              <div class="field">
+                <label for="startTime">Horário inicial <span>*</span></label>
+                <input id="startTime" name="startTime" type="time" required>
+              </div>
+              <div class="field field-span-2">
+                <label for="interval">Intervalo</label>
+                <input id="interval" name="interval" type="text" placeholder="Ex.: 12:00 às 13:00 ou 1 hora" maxlength="80">
+                <small class="field-hint">Informe o período ou a duração do intervalo, quando houver.</small>
+              </div>
+              <div class="field">
+                <label for="endDate">Data final <span>*</span></label>
+                <input id="endDate" name="endDate" type="date" required>
+              </div>
+              <div class="field">
+                <label for="endTime">Horário final <span>*</span></label>
+                <input id="endTime" name="endTime" type="time" required>
+              </div>
+              <div class="field">
+                <label for="vehicleOrder">Nº de ordem do veículo <span>*</span></label>
+                <input id="vehicleOrder" name="vehicleOrder" type="text" placeholder="Ex.: T1-R32" maxlength="30" required>
+              </div>
+              <div class="field">
+                <label for="plate">Placa <span>*</span></label>
+                <input id="plate" name="plate" type="text" placeholder="ABC1D23" maxlength="10" autocomplete="off" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section service-section">
+            <div class="form-section-heading">
+              <span class="section-icon" aria-hidden="true">⇄</span>
+              <h3>Dados do serviço</h3>
+            </div>
+            <div class="form-grid">
+              <div class="field field-span-2">
+                <label for="serviceType">Tipo de serviço <span>*</span></label>
+                <select id="serviceType" name="serviceType" required>
+                  <option value="">Selecione o tipo de serviço</option>
+                  <option value="Plantão">Plantão</option>
+                  <option value="Viagem">Viagem</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="routeFields" class="route-fields is-hidden" aria-hidden="true">
+              <div class="route-heading">
+                <span class="route-line" aria-hidden="true"></span>
+                <div>
+                  <strong>Informações do trajeto</strong>
+                  <small>Preencha a origem e o destino da viagem.</small>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="origin">Origem <span>*</span></label>
+                  <input id="origin" name="origin" type="text" placeholder="Local de origem" maxlength="120" disabled>
+                </div>
+                <div class="field">
+                  <label for="destination">Destino <span>*</span></label>
+                  <input id="destination" name="destination" type="text" placeholder="Local de destino" maxlength="120" disabled>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="duration-preview" id="durationPreview" aria-live="polite">
+            <span class="duration-icon" aria-hidden="true">◷</span>
+            <span>Preencha as datas e os horários para visualizar a duração da jornada.</span>
+          </div>
+
+          <div class="form-footer">
+            <p class="privacy-hint"><span aria-hidden="true">ⓘ</span> Os registros ficam salvos neste navegador até a integração com uma planilha central.</p>
+            <div class="form-actions">
+              <button class="button button-quiet" type="reset">Limpar</button>
+              <button class="button button-primary" type="submit">
+                <span aria-hidden="true">＋</span> Salvar lançamento
+              </button>
+            </div>
+          </div>
+          <div id="formFeedback" class="feedback" role="status" aria-live="polite"></div>
+        </form>
+      </section>
+
+      <section class="panel records-panel">
+        <div class="panel-heading records-heading">
+          <div class="panel-title-wrap">
+            <span class="section-index">02</span>
+            <div>
+              <h2>Histórico de lançamentos</h2>
+              <p>Consulte os registros salvos neste dispositivo.</p>
+            </div>
+          </div>
+          <div class="records-actions">
+            <button id="printButton" class="button button-outline" type="button">
+              <span aria-hidden="true">⎙</span> Imprimir
+            </button>
+            <button id="exportButton" class="button button-export" type="button">
+              <span aria-hidden="true">↓</span> Exportar planilha
+            </button>
+          </div>
+        </div>
+
+        <div class="table-toolbar">
+          <div class="table-count"><span class="count-dot"></span><strong id="recordCount">0 registros</strong></div>
+          <p>O arquivo CSV pode ser aberto no Excel ou Google Sheets.</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Colaborador</th>
+                <th>Data / horário</th>
+                <th>Serviço</th>
+                <th>Veículo</th>
+                <th>Duração</th>
+                <th class="action-column">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody">
+              <tr class="empty-row">
+                <td colspan="6">
+                  <div class="empty-state">
+                    <span class="empty-icon" aria-hidden="true">▤</span>
+                    <strong>Nenhum lançamento por enquanto</strong>
+                    <small>Os registros adicionados no formulário aparecerão aqui.</small>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="records-footnote">
+          <span>Armazenamento local</span>
+          <span>•</span>
+          <span id="lastUpdated">Nenhum registro salvo</span>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Controle de Ponto <span class="footer-separator">/</span> Operações</span>
+      <span>Versão inicial · Integração com planilha em próxima etapa</span>
+    </footer>
+  </div>
+</body>
+</html>
