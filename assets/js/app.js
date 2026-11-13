@@ -266,7 +266,7 @@
   }
 
   function normalizeRegistration(value) {
-    return String(value || "").trim().replace(/\\s+/g, " ").toLocaleUpperCase("pt-BR");
+    return String(value || "").trim().replace(/\s+/g, " ").toLocaleUpperCase("pt-BR");
   }
 
   function getRecordPeriod(record) {
@@ -314,7 +314,7 @@
       lines.push("e mais " + (conflictingRecords.length - 3) + " registro(s).");
     }
 
-    return lines.join("\\n");
+    return lines.join("\n");
   }
 
   function confirmRecordConflicts(record) {
@@ -323,16 +323,16 @@
 
     if (conflicts.duplicates.length) {
       sections.push(
-        "POSSÍVEL LANÇAMENTO DUPLICADO\\n" +
-        "Já existe registro(s) para esta matrícula com o mesmo início e término:\\n" +
+        "POSSÍVEL LANÇAMENTO DUPLICADO\n" +
+        "Já existe registro(s) para esta matrícula com o mesmo início e término:\n" +
         formatConflictEntries(conflicts.duplicates)
       );
     }
 
     if (conflicts.overlaps.length) {
       sections.push(
-        "POSSÍVEL SOBREPOSIÇÃO DE JORNADA\\n" +
-        "O período informado se cruza com outro(s) lançamento(s) desta matrícula:\\n" +
+        "POSSÍVEL SOBREPOSIÇÃO DE JORNADA\n" +
+        "O período informado se cruza com outro(s) lançamento(s) desta matrícula:\n" +
         formatConflictEntries(conflicts.overlaps)
       );
     }
@@ -340,7 +340,7 @@
     if (!sections.length) return true;
 
     sections.push("Deseja salvar mesmo assim? A gravação só será feita com sua confirmação.");
-    return window.confirm(sections.join("\\n\\n"));
+    return window.confirm(sections.join("\n\n"));
   }
 
   function createCell(text, className) {
