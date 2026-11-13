@@ -65,6 +65,11 @@ async function run() {
     await page.locator("#scheduleRegistration").fill("TESTE-001");
     await page.locator("#schedulePreset").selectOption("custom");
     await page.locator("#customScheduleTime").fill("08:00");
+    const beforeScheduleSave = await page.evaluate(() => ({
+      preset: document.querySelector("#schedulePreset").value,
+      customValue: document.querySelector("#customScheduleTime").value
+    }));
+    check(beforeScheduleSave.preset === "custom" && beforeScheduleSave.customValue === "08:00", "Campo personalizado preservado antes de salvar: " + JSON.stringify(beforeScheduleSave));
     await page.locator("#saveScheduleButton").click();
     const scheduleResult = await page.evaluate(() => ({
       feedback: document.querySelector("#scheduleFeedback").textContent,
