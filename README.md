@@ -57,3 +57,8 @@ Esta versão é estática. Os registros ficam no `localStorage` do navegador uti
 A exportação Excel inclui todos os registros armazenados naquele navegador. Use o filtro da coluna **Competência** na aba **Lançamentos** para selecionar um mês. Na aba **Resumo por colaborador**, filtre Competência, Colaborador ou Matrícula para consultar e imprimir o resumo individual. Depois de filtrar, use Arquivo → Imprimir; recomenda-se papel A4, orientação paisagem e ajuste à largura de uma página. No site, o filtro mensal limita o histórico e a impressão. O espelho individual é gerado diretamente na página, após selecionar competência e matrícula, e pode ser impresso separadamente. A exportação Excel exige acesso ao CDN oficial SheetJS.
 
 O cálculo é operacional, baseado na jornada configurada de 7h20 e no intervalo informado. Regras específicas de folha, adicionais noturnos, feriados, DSR ou convenções coletivas não são aplicadas. Antes de utilizar o sistema como controle oficial de ponto, implemente armazenamento central, autenticação, auditoria, backups e políticas de acesso.
+
+
+## Jornadas personalizadas
+
+Na seção **Minha jornada personalizada**, informe a matrícula e escolha a carga diária esperada: 4h, 6h, 7h20, 8h, 12h ou uma carga personalizada em HH:MM. A configuração fica salva localmente neste navegador e é aplicada aos lançamentos daquela matrícula, inclusive aos registros anteriores, atualizando a apuração de horas normais e extras, histórico, espelho mensal e exportações. Matrículas sem configuração continuam usando 7h20. Use **Usar padrão** para remover a personalização. Para escalas como 12x36, configure 12h como referência por dia trabalhado; esta versão não cria automaticamente o calendário alternado de trabalho e descanso.
