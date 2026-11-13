@@ -563,7 +563,7 @@
 
         const serviceCell = document.createElement("td");
         const pill = document.createElement("span");
-        pill.className = "service-pill " + (record.serviceType === "Plantão" ? "plantao" : "");
+        pill.className = "service-pill " + ({ "Plantão": "plantao", "Folga": "folga", "Intervalo": "intervalo", "Viagem": "viagem" }[record.serviceType] || "");
         pill.textContent = record.serviceType || "—";
         serviceCell.append(pill);
         if (record.serviceType === "Viagem") {
