@@ -89,4 +89,4 @@ assert.equal(TimeEngine.getDailyTargetMinutes("D", schedules), 1439);
 assert.equal(TimeEngine.getDailyTargetMinutes("x", { X: 0 }), 440);
 assert.equal(TimeEngine.getDailyTargetMinutes("x", { X: 1440 }), 440);
 
-console.log("Core tests passed: 38 assertions.");
+console.log("Core tests passed.");
