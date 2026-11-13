@@ -53,9 +53,9 @@
     catch (error) { scheduleFeedback.textContent = "Não foi possível salvar a jornada neste navegador."; return false; }
   }
   function getDailyTargetMinutes(registration) {
-    const value = Number(schedules[normalizeRegistration(registration)]);
-    return Number.isInteger(value) && value > 0 && value <= 1440 ? value : CONTRACT_MINUTES;
+    return TimeEngine.getDailyTargetMinutes(registration, schedules, CONTRACT_MINUTES);
   }
+
   function formatTarget(minutes) {
     return Math.floor(minutes / 60) + "h" + String(minutes % 60).padStart(2, "0");
   }
@@ -193,9 +193,7 @@
   }
 
   function parseLocalDateTime(dateValue, timeValue) {
-    if (!dateValue || !timeValue) return null;
-    const date = new Date(dateValue + "T" + timeValue + ":00");
-    return Number.isNaN(date.getTime()) ? null : date;
+    return TimeEngine.parseLocalDateTime(dateValue, timeValue);
   }
 
   function dateObject(value) {
@@ -229,86 +227,15 @@
   }
 
   function parseIntervalMinutes(value) {
-    const input = String(value || "").trim().toLowerCase();
-    if (!input) return 0;
-
-    let match = input.match(/(\d{1,2}):([0-5]\d)\s*(?:às|as|a|[-–—])\s*(\d{1,2}):([0-5]\d)/i);
-    if (match) {
-      const startHour = Number(match[1]);
-      const startMinute = Number(match[2]);
-      const endHour = Number(match[3]);
-      const endMinute = Number(match[4]);
-      if (startHour > 23 || endHour > 23) return null;
-      const start = startHour * 60 + startMinute;
-      const end = endHour * 60 + endMinute;
-      return (end - start + 1440) % 1440;
-    }
-
-    match = input.match(/^(\d{1,3}):([0-5]\d)$/);
-    if (match) return Number(match[1]) * 60 + Number(match[2]);
-
-    match = input.match(/^(\d+(?:[.,]\d+)?)\s*(?:h|hora|horas)$/i);
-    if (match) return Math.round(Number(match[1].replace(",", ".")) * 60);
-
-    match = input.match(/^(\d+)\s*(?:min|minuto|minutos)$/i);
-    if (match) return Number(match[1]);
-
-    return null;
+    return TimeEngine.parseIntervalMinutes(value);
   }
 
   function getWorkMetrics(record) {
-    if (record.serviceType === "Intervalo" || record.serviceType === "Folga") return { elapsedMinutes: 0, intervalMinutes: 0, workedMinutes: 0, regularMinutes: 0, overtimeMinutes: 0 };
-    const start = parseLocalDateTime(record.startDate, record.startTime);
-    const end = parseLocalDateTime(record.endDate, record.endTime);
-    if (!start || !end || end <= start) {
-      return { error: "A data e o horário finais devem ser posteriores ao início." };
-    }
-
-    const elapsedMinutes = Math.floor((end - start) / 60000);
-    const intervalMinutes = parseIntervalMinutes(record.interval);
-    if (intervalMinutes === null) {
-      return { error: "Informe o intervalo como 01:00, 1h, 60 min ou uma faixa como 12:00 às 13:00." };
-    }
-    if (intervalMinutes > elapsedMinutes) {
-      return { error: "O intervalo informado não pode ser maior que o período entre o início e o término." };
-    }
-
-    const workedMinutes = elapsedMinutes - intervalMinutes;
-    const regularMinutes = Math.min(workedMinutes, CONTRACT_MINUTES);
-    const overtimeMinutes = Math.max(0, workedMinutes - CONTRACT_MINUTES);
-    return {
-      elapsedMinutes,
-      intervalMinutes,
-      workedMinutes,
-      regularMinutes,
-      overtimeMinutes
-    };
+    return TimeEngine.getWorkMetrics(record, CONTRACT_MINUTES);
   }
 
-  // Apura por matrícula + data inicial e distribui a cota diária em ordem cronológica.
   function calculateDailyMetrics(sourceRecords) {
-    const result = new Map();
-    const dailyTotals = new Map();
-    const ordered = [...sourceRecords].sort((a, b) => {
-      const left = (a.startDate || "") + " " + (a.startTime || "");
-      const right = (b.startDate || "") + " " + (b.startTime || "");
-      return left.localeCompare(right);
-    });
-    ordered.forEach((record) => {
-      const rawMetrics = getWorkMetrics(record);
-      if (rawMetrics.error) { result.set(record, rawMetrics); return; }
-      if (record.serviceType === "Intervalo" || record.serviceType === "Folga") { result.set(record, { ...rawMetrics, dailyWorkedMinutes: 0, dailyOvertimeMinutes: 0 }); return; }
-      const dailyKey = normalizeRegistration(record.registration) + "|" + (record.startDate || "");
-      const alreadyAllocated = dailyTotals.get(dailyKey) || 0;
-      const dailyTarget = getDailyTargetMinutes(record.registration);
-      const regularMinutes = Math.min(rawMetrics.workedMinutes, Math.max(0, dailyTarget - alreadyAllocated));
-      const overtimeMinutes = rawMetrics.workedMinutes - regularMinutes;
-      dailyTotals.set(dailyKey, alreadyAllocated + rawMetrics.workedMinutes);
-      result.set(record, { ...rawMetrics, regularMinutes, overtimeMinutes,
-        dailyWorkedMinutes: alreadyAllocated + rawMetrics.workedMinutes,
-        dailyOvertimeMinutes: Math.max(0, alreadyAllocated + rawMetrics.workedMinutes - dailyTarget) });
-    });
-    return result;
+    return TimeEngine.calculateDailyMetrics(sourceRecords, getDailyTargetMinutes);
   }
 
   function formatLongDate(date) {
@@ -463,7 +390,7 @@
   }
 
   function normalizeRegistration(value) {
-    return String(value || "").trim().replace(/\s+/g, " ").toLocaleUpperCase("pt-BR");
+    return TimeEngine.normalizeRegistration(value);
   }
 
   function getRecordPeriod(record) {
@@ -1268,7 +1195,7 @@
       if (!match) { scheduleFeedback.textContent = "Informe a carga no formato HH:MM."; return; }
       target = Number(match[1])*60+Number(match[2]);
     }
-    if (!Number.isInteger(target) || target < 1 || target > 1440) { scheduleFeedback.textContent = "A carga deve ser maior que zero e não pode ultrapassar 24 horas."; return; }
+    if (!Number.isInteger(target) || target < 1 || target > 1439) { scheduleFeedback.textContent = "A carga deve ser maior que zero e deve ser inferior a 24 horas."; return; }
     schedules[key] = target;
     if (!persistSchedules()) return;
     renderRecords(); updateDurationPreview(); refreshScheduleForm();
