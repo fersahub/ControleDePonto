@@ -2,7 +2,14 @@
 
 (() => {
   const STORAGE_KEY = "controleDePonto.registros.v1";
+  const SCHEDULES_KEY = "controleDePonto.jornadas.v1";
   const CONTRACT_MINUTES = 7 * 60 + 20;
+  const scheduleRegistrationInput = document.getElementById("scheduleRegistration");
+  const schedulePreset = document.getElementById("schedulePreset");
+  const customScheduleField = document.getElementById("customScheduleField");
+  const customScheduleTime = document.getElementById("customScheduleTime");
+  const scheduleFeedback = document.getElementById("scheduleFeedback");
+  const schedules = loadSchedules();
   const form = document.getElementById("timeForm");
   const routeFields = document.getElementById("routeFields");
   const serviceType = document.getElementById("serviceType");
@@ -33,6 +40,32 @@
       console.warn("Não foi possível ler os registros locais.", error);
       return [];
     }
+  }
+
+  function loadSchedules() {
+    try {
+      const value = JSON.parse(localStorage.getItem(SCHEDULES_KEY) || "{}");
+      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } catch (error) { console.warn("Falha ao ler jornadas.", error); return {}; }
+  }
+  function persistSchedules() {
+    try { localStorage.setItem(SCHEDULES_KEY, JSON.stringify(schedules)); return true; }
+    catch (error) { scheduleFeedback.textContent = "Não foi possível salvar a jornada neste navegador."; return false; }
+  }
+  function getDailyTargetMinutes(registration) {
+    const value = Number(schedules[normalizeRegistration(registration)]);
+    return Number.isInteger(value) && value > 0 && value <= 1440 ? value : CONTRACT_MINUTES;
+  }
+  function formatTarget(minutes) {
+    return Math.floor(minutes / 60) + "h" + String(minutes % 60).padStart(2, "0");
+  }
+  function refreshScheduleForm() {
+    const key = normalizeRegistration(scheduleRegistrationInput.value);
+    const target = key ? getDailyTargetMinutes(key) : CONTRACT_MINUTES;
+    schedulePreset.value = [240,360,440,480,720].includes(target) ? String(target) : "custom";
+    customScheduleField.classList.toggle("is-hidden", schedulePreset.value !== "custom");
+    customScheduleTime.value = String(Math.floor(target/60)).padStart(2,"0")+":"+String(target%60).padStart(2,"0");
+    scheduleFeedback.textContent = key ? "Jornada atual: "+formatTarget(target)+" por dia"+(schedules[key] ? " (personalizada)." : " (padrão).") : "A jornada padrão é de 7h20 por dia. Informe uma matrícula para personalizar.";
   }
 
   function persistRecords() {
@@ -161,12 +194,13 @@
       if (record.serviceType === "Intervalo" || record.serviceType === "Folga") { result.set(record, { ...rawMetrics, dailyWorkedMinutes: 0, dailyOvertimeMinutes: 0 }); return; }
       const dailyKey = normalizeRegistration(record.registration) + "|" + (record.startDate || "");
       const alreadyAllocated = dailyTotals.get(dailyKey) || 0;
-      const regularMinutes = Math.min(rawMetrics.workedMinutes, Math.max(0, CONTRACT_MINUTES - alreadyAllocated));
+      const dailyTarget = getDailyTargetMinutes(record.registration);
+      const regularMinutes = Math.min(rawMetrics.workedMinutes, Math.max(0, dailyTarget - alreadyAllocated));
       const overtimeMinutes = rawMetrics.workedMinutes - regularMinutes;
       dailyTotals.set(dailyKey, alreadyAllocated + rawMetrics.workedMinutes);
       result.set(record, { ...rawMetrics, regularMinutes, overtimeMinutes,
         dailyWorkedMinutes: alreadyAllocated + rawMetrics.workedMinutes,
-        dailyOvertimeMinutes: Math.max(0, alreadyAllocated + rawMetrics.workedMinutes - CONTRACT_MINUTES) });
+        dailyOvertimeMinutes: Math.max(0, alreadyAllocated + rawMetrics.workedMinutes - dailyTarget) });
     });
     return result;
   }
@@ -274,8 +308,9 @@
     }
 
     durationPreview.classList.add("is-ready");
+    const target = getDailyTargetMinutes(previewRecord.registration);
     durationPreview.textContent = "Jornada líquida: " + formatMinutes(metrics.workedMinutes) +
-      " · Horas extras: " + formatMinutes(metrics.overtimeMinutes) + " (base 7h20).";
+      " · Horas extras: " + formatMinutes(metrics.overtimeMinutes) + " (meta diária " + formatTarget(target) + ").";
   }
 
   function getFormData() {
@@ -538,7 +573,7 @@
     const periodLabel = monthFilter.value ? formatMonth(monthFilter.value) : "Todos os meses";
     document.getElementById("printReportTitle").textContent =
       "Relatório de controle de ponto · " + periodLabel +
-      " · Base contratual 7h20 · Horas extras calculadas após desconto do intervalo";
+      " · Jornada diária conforme configuração da matrícula · Horas extras após desconto do intervalo";
 
     if (records.length) {
       const newest = [...records].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
@@ -579,7 +614,7 @@
         record.serviceType, record.origin, record.destination,
         (metrics.elapsedMinutes / 60).toFixed(2).replace(".", ","),
         (metrics.workedMinutes / 60).toFixed(2).replace(".", ","),
-        (CONTRACT_MINUTES / 60).toFixed(2).replace(".", ","),
+        (getDailyTargetMinutes(record.registration) / 60).toFixed(2).replace(".", ","),
         (metrics.regularMinutes / 60).toFixed(2).replace(".", ","),
         (metrics.overtimeMinutes / 60).toFixed(2).replace(".", ",")
       ];
@@ -647,7 +682,7 @@
         record.destination || "",
         excelDuration(metrics.elapsedMinutes),
         excelDuration(metrics.workedMinutes),
-        excelDuration(CONTRACT_MINUTES),
+        excelDuration(getDailyTargetMinutes(record.registration)),
         excelDuration(metrics.regularMinutes),
         excelDuration(metrics.overtimeMinutes),
         record.createdAt ? new Date(record.createdAt) : ""
@@ -867,9 +902,9 @@
       ["Jornada bruta", "Diferença entre a data/hora final e a data/hora inicial."],
       ["Intervalo", "O intervalo informado é descontado da jornada bruta. Formatos aceitos no site: 01:00, 1h, 60 min ou 12:00 às 13:00. Campo vazio equivale a zero."],
       ["Horas trabalhadas", "Jornada bruta menos intervalo descontado."],
-      ["Base contratual", "7 horas e 20 minutos por colaborador em cada data inicial. A base é diária e compartilhada pelos lançamentos do mesmo dia."],
-      ["Horas extras", "Apuradas sobre o total de horas líquidas do colaborador em cada data inicial. O limite diário é 7h20; os excedentes são distribuídos cronologicamente entre os lançamentos."],
-      ["Horas normais", "Até completar 7h20 no total diário por matrícula. Lançamentos posteriores no mesmo dia recebem somente a parcela que exceder a cota diária restante."],
+      ["Jornada diária", "A carga diária é configurável por matrícula no site. Matrículas sem configuração usam o padrão de 7h20. O valor configurado é exportado na coluna Base contratual."],
+      ["Horas extras", "Apuradas sobre o total de horas líquidas da matrícula em cada data inicial. O limite é a jornada diária configurada para aquela matrícula; os excedentes são distribuídos cronologicamente entre os lançamentos."],
+      ["Horas normais", "Até completar a jornada diária configurada para a matrícula. Lançamentos posteriores no mesmo dia recebem somente a parcela que exceder a cota diária restante."],
       ["Jornadas após meia-noite", "Todo o período líquido do lançamento é atribuído à data inicial, conforme regra operacional configurada."],
       ["Competência", "Mês e ano da Data inicial do lançamento."],
       ["Armazenamento", "A exportação contém os registros guardados no navegador em que o site foi utilizado. Esta versão ainda não sincroniza dados entre computadores."],
@@ -1052,7 +1087,7 @@
 
     const note = document.createElement("p");
     note.className = "individual-report-note";
-    note.textContent = "Critério: base diária de 7h20 por matrícula. As horas normais são alocadas cronologicamente entre os lançamentos do dia; o excedente é classificado como hora extra. Jornadas que atravessam a meia-noite permanecem vinculadas à data inicial.";
+    note.textContent = "Critério: jornada diária de " + formatTarget(getDailyTargetMinutes(registration)) + " para esta matrícula. As horas normais são alocadas cronologicamente entre os lançamentos do dia; o excedente é classificado como hora extra. Jornadas que atravessam a meia-noite permanecem vinculadas à data inicial.";
     individualReportOutput.append(note);
     if (invalidCount) {
       const warning = document.createElement("p");
@@ -1115,6 +1150,33 @@
     }, 0);
   });
 
+  schedulePreset.addEventListener("change", () => customScheduleField.classList.toggle("is-hidden", schedulePreset.value !== "custom"));
+  scheduleRegistrationInput.addEventListener("blur", refreshScheduleForm);
+  scheduleRegistrationInput.addEventListener("change", refreshScheduleForm);
+  document.getElementById("saveScheduleButton").addEventListener("click", () => {
+    const key = normalizeRegistration(scheduleRegistrationInput.value);
+    if (!key) { scheduleFeedback.textContent = "Informe a matrícula para salvar uma jornada."; scheduleRegistrationInput.focus(); return; }
+    let target = Number(schedulePreset.value);
+    if (schedulePreset.value === "custom") {
+      const match = customScheduleTime.value.match(/^(\\d{2}):(\\d{2})$/);
+      if (!match) { scheduleFeedback.textContent = "Informe a carga no formato HH:MM."; return; }
+      target = Number(match[1])*60+Number(match[2]);
+    }
+    if (!Number.isInteger(target) || target < 1 || target > 1440) { scheduleFeedback.textContent = "A carga deve ser maior que zero e não pode ultrapassar 24 horas."; return; }
+    schedules[key] = target;
+    if (!persistSchedules()) return;
+    renderRecords(); updateDurationPreview(); refreshScheduleForm();
+    scheduleFeedback.textContent = "Jornada de "+formatTarget(target)+" salva para a matrícula "+key+". Cálculos e relatórios atualizados.";
+  });
+  document.getElementById("resetScheduleButton").addEventListener("click", () => {
+    const key = normalizeRegistration(scheduleRegistrationInput.value);
+    if (!key) { scheduleFeedback.textContent = "Informe a matrícula para restaurar o padrão."; return; }
+    delete schedules[key];
+    if (!persistSchedules()) return;
+    renderRecords(); updateDurationPreview(); refreshScheduleForm();
+    scheduleFeedback.textContent = "Matrícula "+key+" restaurada para a jornada padrão de 7h20.";
+  });
+
   serviceType.addEventListener("change", () => {
     toggleRouteFields();
     updateDurationPreview();
@@ -1156,6 +1218,7 @@
   printButton.addEventListener("click", () => window.print());
 
   document.getElementById("todayLabel").textContent = formatLongDate(new Date());
+  refreshScheduleForm();
   startDateInput.value = localDateString();
   endDateInput.value = localDateString();
   toggleRouteFields();
