@@ -6,6 +6,8 @@ const APP_SHELL = [
   "./assets/js/time-engine.js",
   "./assets/js/app.js",
   "./manifest.webmanifest",
+  "./assets/icons/icon-192.svg",
+  "./assets/icons/icon-512.svg",
   "./assets/icons/icon.svg"
 ];
 
