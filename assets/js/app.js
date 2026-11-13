@@ -2,11 +2,13 @@
 
 (() => {
   const STORAGE_KEY = "controleDePonto.registros.v1";
+  const CONTRACT_MINUTES = 7 * 60 + 20;
   const form = document.getElementById("timeForm");
   const routeFields = document.getElementById("routeFields");
   const serviceType = document.getElementById("serviceType");
   const originInput = document.getElementById("origin");
   const destinationInput = document.getElementById("destination");
+  const intervalInput = document.getElementById("interval");
   const startDateInput = document.getElementById("startDate");
   const startTimeInput = document.getElementById("startTime");
   const endDateInput = document.getElementById("endDate");
@@ -15,7 +17,10 @@
   const feedback = document.getElementById("formFeedback");
   const recordsBody = document.getElementById("recordsBody");
   const exportButton = document.getElementById("exportButton");
+  const exportCsvButton = document.getElementById("exportCsvButton");
   const printButton = document.getElementById("printButton");
+  const monthFilter = document.getElementById("monthFilter");
+  const clearFilterButton = document.getElementById("clearFilterButton");
 
   let records = loadRecords();
 
@@ -45,29 +50,99 @@
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return year + "-" + month + "-" + day;
   }
 
   function parseLocalDateTime(dateValue, timeValue) {
     if (!dateValue || !timeValue) return null;
-    const date = new Date(`${dateValue}T${timeValue}:00`);
+    const date = new Date(dateValue + "T" + timeValue + ":00");
     return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function dateObject(value) {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+    const parts = value.split("-").map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
   }
 
   function formatDate(value) {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "—";
-    const [year, month, day] = value.split("-");
-    return `${day}/${month}/${year}`;
+    const parts = value.split("-");
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
   }
 
-  function formatDuration(startDate, startTime, endDate, endTime) {
-    const start = parseLocalDateTime(startDate, startTime);
-    const end = parseLocalDateTime(endDate, endTime);
-    if (!start || !end || end <= start) return "—";
-    const totalMinutes = Math.floor((end - start) / 60000);
+  function monthKey(dateValue) {
+    return dateValue && /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue.slice(0, 7) : "";
+  }
+
+  function formatMonth(value) {
+    if (!/^\d{4}-\d{2}$/.test(value)) return "Todos os meses";
+    const parts = value.split("-");
+    const date = new Date(Number(parts[0]), Number(parts[1]) - 1, 1, 12);
+    return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date);
+  }
+
+  function formatMinutes(totalMinutes) {
+    if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return "—";
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    return `${hours}h ${String(minutes).padStart(2, "0")}min`;
+    return hours + "h " + String(minutes).padStart(2, "0") + "min";
+  }
+
+  function parseIntervalMinutes(value) {
+    const input = String(value || "").trim().toLowerCase();
+    if (!input) return 0;
+
+    let match = input.match(/(\d{1,2}):([0-5]\d)\s*(?:às|as|a|[-–—])\s*(\d{1,2}):([0-5]\d)/i);
+    if (match) {
+      const startHour = Number(match[1]);
+      const startMinute = Number(match[2]);
+      const endHour = Number(match[3]);
+      const endMinute = Number(match[4]);
+      if (startHour > 23 || endHour > 23) return null;
+      const start = startHour * 60 + startMinute;
+      const end = endHour * 60 + endMinute;
+      return (end - start + 1440) % 1440;
+    }
+
+    match = input.match(/^(\d{1,3}):([0-5]\d)$/);
+    if (match) return Number(match[1]) * 60 + Number(match[2]);
+
+    match = input.match(/^(\d+(?:[.,]\d+)?)\s*(?:h|hora|horas)$/i);
+    if (match) return Math.round(Number(match[1].replace(",", ".")) * 60);
+
+    match = input.match(/^(\d+)\s*(?:min|minuto|minutos)$/i);
+    if (match) return Number(match[1]);
+
+    return null;
+  }
+
+  function getWorkMetrics(record) {
+    const start = parseLocalDateTime(record.startDate, record.startTime);
+    const end = parseLocalDateTime(record.endDate, record.endTime);
+    if (!start || !end || end <= start) {
+      return { error: "A data e o horário finais devem ser posteriores ao início." };
+    }
+
+    const elapsedMinutes = Math.floor((end - start) / 60000);
+    const intervalMinutes = parseIntervalMinutes(record.interval);
+    if (intervalMinutes === null) {
+      return { error: "Informe o intervalo como 01:00, 1h, 60 min ou uma faixa como 12:00 às 13:00." };
+    }
+    if (intervalMinutes > elapsedMinutes) {
+      return { error: "O intervalo informado não pode ser maior que o período entre o início e o término." };
+    }
+
+    const workedMinutes = elapsedMinutes - intervalMinutes;
+    const regularMinutes = Math.min(workedMinutes, CONTRACT_MINUTES);
+    const overtimeMinutes = Math.max(0, workedMinutes - CONTRACT_MINUTES);
+    return {
+      elapsedMinutes,
+      intervalMinutes,
+      workedMinutes,
+      regularMinutes,
+      overtimeMinutes
+    };
   }
 
   function formatLongDate(date) {
@@ -76,7 +151,7 @@
 
   function showFeedback(message, type) {
     feedback.textContent = message;
-    feedback.className = `feedback is-visible is-${type}`;
+    feedback.className = "feedback is-visible is-" + type;
   }
 
   function clearFeedback() {
@@ -104,7 +179,7 @@
     const end = parseLocalDateTime(endDateInput.value, endTimeInput.value);
     if (!start || !end) {
       durationPreview.classList.remove("is-ready");
-      durationPreview.textContent = "Preencha as datas e os horários para visualizar a duração da jornada.";
+      durationPreview.textContent = "Preencha as datas e os horários para visualizar a jornada e as horas extras.";
       return;
     }
     if (end <= start) {
@@ -112,8 +187,23 @@
       durationPreview.textContent = "A data e o horário finais precisam ser posteriores ao início.";
       return;
     }
+
+    const metrics = getWorkMetrics({
+      startDate: startDateInput.value,
+      startTime: startTimeInput.value,
+      endDate: endDateInput.value,
+      endTime: endTimeInput.value,
+      interval: intervalInput.value
+    });
+    if (metrics.error) {
+      durationPreview.classList.remove("is-ready");
+      durationPreview.textContent = metrics.error;
+      return;
+    }
+
     durationPreview.classList.add("is-ready");
-    durationPreview.textContent = `Duração entre início e término: ${formatDuration(startDateInput.value, startTimeInput.value, endDateInput.value, endTimeInput.value)}`;
+    durationPreview.textContent = "Jornada líquida: " + formatMinutes(metrics.workedMinutes) +
+      " · Horas extras: " + formatMinutes(metrics.overtimeMinutes) + " (base 7h20).";
   }
 
   function getFormData() {
@@ -121,7 +211,7 @@
     return {
       id: (window.crypto && typeof window.crypto.randomUUID === "function")
         ? window.crypto.randomUUID()
-        : `registro-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        : "registro-" + Date.now() + "-" + Math.random().toString(16).slice(2),
       fullName: String(data.get("fullName") || "").trim(),
       registration: String(data.get("registration") || "").trim(),
       startDate: String(data.get("startDate") || ""),
@@ -151,13 +241,11 @@
       ["Tipo de serviço", record.serviceType]
     ];
     const missing = requiredFields.find(([, value]) => !value);
-    if (missing) return `Preencha o campo obrigatório: ${missing[0]}.`;
+    if (missing) return "Preencha o campo obrigatório: " + missing[0] + ".";
     if (record.serviceType !== "Plantão" && record.serviceType !== "Viagem") return "Selecione Plantão ou Viagem.";
     if (record.serviceType === "Viagem" && (!record.origin || !record.destination)) return "Informe a origem e o destino da viagem.";
-    const start = parseLocalDateTime(record.startDate, record.startTime);
-    const end = parseLocalDateTime(record.endDate, record.endTime);
-    if (!start || !end) return "Confira as datas e os horários informados.";
-    if (end <= start) return "A data e o horário finais devem ser posteriores ao início.";
+    const metrics = getWorkMetrics(record);
+    if (metrics.error) return metrics.error;
     return "";
   }
 
@@ -179,14 +267,46 @@
     return cell;
   }
 
+  function getVisibleRecords() {
+    const selectedMonth = monthFilter.value;
+    const sorted = [...records].sort((a, b) => {
+      const left = (a.startDate || "") + " " + (a.startTime || "");
+      const right = (b.startDate || "") + " " + (b.startTime || "");
+      return right.localeCompare(left);
+    });
+    return selectedMonth ? sorted.filter((record) => monthKey(record.startDate) === selectedMonth) : sorted;
+  }
+
+  function updateMonthFilterOptions() {
+    const selected = monthFilter.value;
+    const months = [...new Set(records.map((record) => monthKey(record.startDate)).filter(Boolean))].sort().reverse();
+    monthFilter.replaceChildren();
+
+    const allOption = document.createElement("option");
+    allOption.value = "";
+    allOption.textContent = "Todos os meses";
+    monthFilter.append(allOption);
+
+    months.forEach((month) => {
+      const option = document.createElement("option");
+      option.value = month;
+      option.textContent = formatMonth(month);
+      monthFilter.append(option);
+    });
+
+    monthFilter.value = months.includes(selected) ? selected : "";
+  }
+
   function renderRecords() {
+    updateMonthFilterOptions();
+    const visibleRecords = getVisibleRecords();
     recordsBody.replaceChildren();
 
-    if (records.length === 0) {
+    if (visibleRecords.length === 0) {
       const row = document.createElement("tr");
       row.className = "empty-row";
       const cell = document.createElement("td");
-      cell.colSpan = 6;
+      cell.colSpan = 7;
       const state = document.createElement("div");
       state.className = "empty-state";
       const icon = document.createElement("span");
@@ -194,30 +314,33 @@
       icon.setAttribute("aria-hidden", "true");
       icon.textContent = "▤";
       const title = document.createElement("strong");
-      title.textContent = "Nenhum lançamento por enquanto";
+      title.textContent = monthFilter.value ? "Nenhum lançamento neste mês" : "Nenhum lançamento por enquanto";
       const description = document.createElement("small");
-      description.textContent = "Os registros adicionados no formulário aparecerão aqui.";
+      description.textContent = monthFilter.value
+        ? "Selecione outro mês ou limpe o filtro para consultar os demais registros."
+        : "Os registros adicionados no formulário aparecerão aqui.";
       state.append(icon, title, description);
       cell.append(state);
       row.append(cell);
       recordsBody.append(row);
     } else {
-      [...records].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).forEach((record) => {
+      visibleRecords.forEach((record) => {
+        const metrics = getWorkMetrics(record);
         const row = document.createElement("tr");
 
-        const person = createStackCell(record.fullName || "—", `Matrícula: ${record.registration || "—"}`, "person-cell");
-        row.append(person);
+        row.append(createStackCell(record.fullName || "—", "Matrícula: " + (record.registration || "—"), "person-cell"));
 
-        row.append(createStackCell(formatDate(record.startDate), `${record.startTime || "—"} → ${formatDate(record.endDate)} ${record.endTime || ""}`, "date-cell"));
+        const intervalLabel = metrics.error ? (record.interval || "não informado") : formatMinutes(metrics.intervalMinutes);
+        row.append(createStackCell(formatDate(record.startDate), (record.startTime || "—") + " → " + formatDate(record.endDate) + " " + (record.endTime || "") + " · Intervalo: " + intervalLabel, "date-cell"));
 
         const serviceCell = document.createElement("td");
         const pill = document.createElement("span");
-        pill.className = `service-pill ${record.serviceType === "Plantão" ? "plantao" : ""}`;
+        pill.className = "service-pill " + (record.serviceType === "Plantão" ? "plantao" : "");
         pill.textContent = record.serviceType || "—";
         serviceCell.append(pill);
         if (record.serviceType === "Viagem") {
           const route = document.createElement("small");
-          route.textContent = `${record.origin || "—"} → ${record.destination || "—"}`;
+          route.textContent = (record.origin || "—") + " → " + (record.destination || "—");
           route.style.display = "block";
           route.style.marginTop = "4px";
           route.style.color = "#98a3b0";
@@ -225,9 +348,12 @@
           serviceCell.append(route);
         }
         row.append(serviceCell);
-
         row.append(createStackCell(record.vehicleOrder || "—", record.plate || "—", "vehicle-cell"));
-        row.append(createCell(formatDuration(record.startDate, record.startTime, record.endDate, record.endTime), "duration-cell"));
+
+        row.append(createCell(metrics.error ? "—" : formatMinutes(metrics.workedMinutes), "duration-cell"));
+        const overtimeCell = createCell(metrics.error ? "—" : formatMinutes(metrics.overtimeMinutes), "overtime-cell");
+        if (!metrics.error && metrics.overtimeMinutes > 0) overtimeCell.classList.add("has-overtime");
+        row.append(overtimeCell);
 
         const actionCell = document.createElement("td");
         actionCell.className = "action-cell";
@@ -236,7 +362,7 @@
         removeButton.className = "delete-button";
         removeButton.dataset.deleteId = record.id;
         removeButton.textContent = "Excluir";
-        removeButton.setAttribute("aria-label", `Excluir lançamento de ${record.fullName || "colaborador"}`);
+        removeButton.setAttribute("aria-label", "Excluir lançamento de " + (record.fullName || "colaborador"));
         actionCell.append(removeButton);
         row.append(actionCell);
 
@@ -245,16 +371,26 @@
     }
 
     const today = localDateString();
-    document.getElementById("totalRecords").textContent = String(records.length);
-    document.getElementById("todayRecords").textContent = String(records.filter((item) => item.startDate === today).length);
-    document.getElementById("vehicleCount").textContent = String(new Set(records.map((item) => (item.plate || "").toUpperCase()).filter(Boolean)).size);
-    document.getElementById("recordCount").textContent = `${records.length} ${records.length === 1 ? "registro" : "registros"}`;
+    const overtimeTotal = visibleRecords.reduce((sum, record) => {
+      const metrics = getWorkMetrics(record);
+      return sum + (metrics.error ? 0 : metrics.overtimeMinutes);
+    }, 0);
+    document.getElementById("totalRecords").textContent = String(visibleRecords.length);
+    document.getElementById("totalOvertime").textContent = formatMinutes(overtimeTotal).replace("min", "").trim();
+    document.getElementById("todayRecords").textContent = String(visibleRecords.filter((item) => item.startDate === today).length);
+    document.getElementById("vehicleCount").textContent = String(new Set(visibleRecords.map((item) => (item.plate || "").toUpperCase()).filter(Boolean)).size);
+    document.getElementById("recordCount").textContent = visibleRecords.length + " " + (visibleRecords.length === 1 ? "registro" : "registros");
+
+    const periodLabel = monthFilter.value ? formatMonth(monthFilter.value) : "Todos os meses";
+    document.getElementById("printReportTitle").textContent =
+      "Relatório de controle de ponto · " + periodLabel +
+      " · Base contratual 7h20 · Horas extras calculadas após desconto do intervalo";
 
     if (records.length) {
       const newest = [...records].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
       const date = newest.createdAt ? new Date(newest.createdAt) : null;
       document.getElementById("lastUpdated").textContent = date && !Number.isNaN(date.getTime())
-        ? `Último lançamento: ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(date)}`
+        ? "Último lançamento: " + new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(date)
         : "Histórico atualizado";
     } else {
       document.getElementById("lastUpdated").textContent = "Nenhum registro salvo";
@@ -263,7 +399,7 @@
 
   function csvEscape(value) {
     const text = String(value ?? "");
-    return `"${text.replace(/"/g, '""')}"`;
+    return '"' + text.replace(/"/g, '""') + '"';
   }
 
   function exportCsv() {
@@ -272,27 +408,185 @@
       return;
     }
     const headers = [
-      "Nome completo", "Matrícula", "Data inicial", "Horário inicial", "Intervalo",
-      "Data final", "Horário final", "Nº de ordem do veículo", "Placa", "Tipo de serviço",
-      "Origem", "Destino", "Duração"
+      "Competência", "Nome completo", "Matrícula", "Data inicial", "Horário inicial",
+      "Intervalo informado", "Intervalo descontado (horas)", "Data final", "Horário final",
+      "Nº de ordem do veículo", "Placa", "Tipo de serviço", "Origem", "Destino",
+      "Jornada bruta (horas)", "Horas trabalhadas (horas)", "Base contratual (horas)",
+      "Horas normais (horas)", "Horas extras (horas)"
     ];
-    const rows = records.map((record) => [
-      record.fullName, record.registration, formatDate(record.startDate), record.startTime,
-      record.interval, formatDate(record.endDate), record.endTime, record.vehicleOrder,
-      record.plate, record.serviceType, record.origin, record.destination,
-      formatDuration(record.startDate, record.startTime, record.endDate, record.endTime)
-    ]);
+    const rows = records.map((record) => {
+      const metrics = getWorkMetrics(record);
+      if (metrics.error) return [];
+      return [
+        monthKey(record.startDate), record.fullName, record.registration, formatDate(record.startDate),
+        record.startTime, record.interval, (metrics.intervalMinutes / 60).toFixed(2).replace(".", ","),
+        formatDate(record.endDate), record.endTime, record.vehicleOrder, record.plate,
+        record.serviceType, record.origin, record.destination,
+        (metrics.elapsedMinutes / 60).toFixed(2).replace(".", ","),
+        (metrics.workedMinutes / 60).toFixed(2).replace(".", ","),
+        (CONTRACT_MINUTES / 60).toFixed(2).replace(".", ","),
+        (metrics.regularMinutes / 60).toFixed(2).replace(".", ","),
+        (metrics.overtimeMinutes / 60).toFixed(2).replace(".", ",")
+      ];
+    }).filter((row) => row.length);
     const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(";")).join("\r\n");
     const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `controle-de-ponto-${localDateString()}.csv`;
+    link.download = "controle-de-ponto-" + localDateString() + ".csv";
     document.body.append(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    showFeedback("Arquivo CSV gerado. Você pode abri-lo no Excel ou importá-lo no Google Sheets.", "success");
+    showFeedback("Arquivo CSV gerado com jornada líquida e horas extras.", "success");
+  }
+
+  function excelDuration(minutes) {
+    return minutes / 1440;
+  }
+
+  function exportExcel() {
+    if (records.length === 0) {
+      showFeedback("Ainda não há lançamentos para exportar.", "error");
+      return;
+    }
+    if (!window.XLSX || !window.XLSX.utils || !window.XLSX.writeFile) {
+      showFeedback("O componente de exportação Excel não carregou. Atualize a página e tente novamente; a opção CSV continua disponível.", "error");
+      return;
+    }
+
+    const XLSX = window.XLSX;
+    const sortedRecords = [...records].sort((a, b) => {
+      const left = (a.startDate || "") + " " + (a.startTime || "");
+      const right = (b.startDate || "") + " " + (b.startTime || "");
+      return left.localeCompare(right);
+    });
+
+    const headers = [
+      "Competência", "Nome completo", "Matrícula", "Data inicial", "Horário inicial",
+      "Intervalo informado", "Intervalo descontado", "Data final", "Horário final",
+      "Nº de ordem do veículo", "Placa", "Tipo de serviço", "Origem", "Destino",
+      "Jornada bruta", "Horas trabalhadas", "Base contratual", "Horas normais",
+      "Horas extras", "Lançado em"
+    ];
+
+    const rows = sortedRecords.map((record) => {
+      const metrics = getWorkMetrics(record);
+      if (metrics.error) return null;
+      return [
+        monthKey(record.startDate),
+        record.fullName,
+        record.registration,
+        dateObject(record.startDate),
+        record.startTime,
+        record.interval || "",
+        excelDuration(metrics.intervalMinutes),
+        dateObject(record.endDate),
+        record.endTime,
+        record.vehicleOrder,
+        record.plate,
+        record.serviceType,
+        record.origin || "",
+        record.destination || "",
+        excelDuration(metrics.elapsedMinutes),
+        excelDuration(metrics.workedMinutes),
+        excelDuration(CONTRACT_MINUTES),
+        excelDuration(metrics.regularMinutes),
+        excelDuration(metrics.overtimeMinutes),
+        record.createdAt ? new Date(record.createdAt) : ""
+      ];
+    }).filter(Boolean);
+
+    if (rows.length === 0) {
+      showFeedback("Não há registros válidos para exportar. Revise as datas, horários e intervalos.", "error");
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const launchSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const finalRow = rows.length + 1;
+    launchSheet["!autofilter"] = { ref: "A1:T" + finalRow };
+    launchSheet["!cols"] = [
+      { wch: 13 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 12 },
+      { wch: 24 }, { wch: 19 }, { wch: 13 }, { wch: 12 }, { wch: 20 },
+      { wch: 12 }, { wch: 16 }, { wch: 24 }, { wch: 24 }, { wch: 16 },
+      { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 20 }
+    ];
+
+    for (let rowIndex = 2; rowIndex <= finalRow; rowIndex += 1) {
+      ["G", "O", "P", "Q", "R", "S"].forEach((column) => {
+        const cell = launchSheet[column + rowIndex];
+        if (cell) cell.z = "[h]:mm";
+      });
+      ["D", "H"].forEach((column) => {
+        const cell = launchSheet[column + rowIndex];
+        if (cell) cell.z = "dd/mm/yyyy";
+      });
+      const timestampCell = launchSheet["T" + rowIndex];
+      if (timestampCell) timestampCell.z = "dd/mm/yyyy hh:mm";
+    }
+    XLSX.utils.book_append_sheet(workbook, launchSheet, "Lançamentos");
+
+    const months = [...new Set(sortedRecords.map((record) => monthKey(record.startDate)).filter(Boolean))].sort();
+    const summaryHeaders = ["Competência", "Lançamentos", "Horas trabalhadas", "Horas extras", "Plantões", "Viagens"];
+    const summarySheet = XLSX.utils.aoa_to_sheet([summaryHeaders, ...months.map((month) => [month, 0, 0, 0, 0, 0])]);
+    const summaryEndRow = rows.length + 1;
+    months.forEach((month, index) => {
+      const excelRow = index + 2;
+      const monthRecords = sortedRecords.filter((record) => monthKey(record.startDate) === month);
+      const totals = monthRecords.reduce((acc, record) => {
+        const metrics = getWorkMetrics(record);
+        if (!metrics.error) {
+          acc.worked += metrics.workedMinutes;
+          acc.overtime += metrics.overtimeMinutes;
+        }
+        return acc;
+      }, { worked: 0, overtime: 0 });
+      const recordsRange = "'Lançamentos'!$A$2:$A$" + summaryEndRow;
+      const serviceRange = "'Lançamentos'!$L$2:$L$" + summaryEndRow;
+      const workedRange = "'Lançamentos'!$P$2:$P$" + summaryEndRow;
+      const overtimeRange = "'Lançamentos'!$S$2:$S$" + summaryEndRow;
+      summarySheet["B" + excelRow] = { t: "n", f: "COUNTIF(" + recordsRange + ",A" + excelRow + ")", v: monthRecords.length };
+      summarySheet["C" + excelRow] = { t: "n", f: "SUMIF(" + recordsRange + ",A" + excelRow + "," + workedRange + ")", v: excelDuration(totals.worked) , z: "[h]:mm" };
+      summarySheet["D" + excelRow] = { t: "n", f: "SUMIF(" + recordsRange + ",A" + excelRow + "," + overtimeRange + ")", v: excelDuration(totals.overtime), z: "[h]:mm" };
+      const plantaoCount = monthRecords.filter((record) => record.serviceType === "Plantão").length;
+      const tripCount = monthRecords.filter((record) => record.serviceType === "Viagem").length;
+      summarySheet["E" + excelRow] = { t: "n", f: "COUNTIFS(" + recordsRange + ",A" + excelRow + "," + serviceRange + ",\"Plantão\")", v: plantaoCount };
+      summarySheet["F" + excelRow] = { t: "n", f: "COUNTIFS(" + recordsRange + ",A" + excelRow + "," + serviceRange + ",\"Viagem\")", v: tripCount };
+    });
+    summarySheet["!autofilter"] = { ref: "A1:F" + Math.max(1, months.length + 1) };
+    summarySheet["!cols"] = [{ wch: 17 }, { wch: 16 }, { wch: 23 }, { wch: 18 }, { wch: 14 }, { wch: 14 }];
+    for (let rowIndex = 2; rowIndex <= months.length + 1; rowIndex += 1) {
+      ["C", "D"].forEach((column) => {
+        const cell = summarySheet[column + rowIndex];
+        if (cell) cell.z = "[h]:mm";
+      });
+    }
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Resumo mensal");
+
+    const instructions = [
+      ["CONTROLE DE PONTO · INSTRUÇÕES"],
+      ["Como usar", "Na aba Lançamentos, use o filtro da coluna Competência para selecionar o mês desejado."],
+      ["Resumo", "A aba Resumo mensal consolida quantidade de lançamentos, horas trabalhadas, horas extras, plantões e viagens por mês."],
+      ["Jornada bruta", "Diferença entre a data/hora final e a data/hora inicial."],
+      ["Intervalo", "O intervalo informado é descontado da jornada bruta. Formatos aceitos no site: 01:00, 1h, 60 min ou 12:00 às 13:00. Campo vazio equivale a zero."],
+      ["Horas trabalhadas", "Jornada bruta menos intervalo descontado."],
+      ["Base contratual", "7 horas e 20 minutos por lançamento."],
+      ["Horas extras", "Somente o tempo que exceder 7h20 de horas trabalhadas líquidas em cada lançamento."],
+      ["Horas normais", "Limitadas a 7h20 por lançamento. O excedente aparece na coluna Horas extras."],
+      ["Competência", "Mês e ano da Data inicial do lançamento."],
+      ["Armazenamento", "A exportação contém os registros guardados no navegador em que o site foi utilizado. Esta versão ainda não sincroniza dados entre computadores."],
+      ["Observação", "O cálculo é operacional, com base nos critérios configurados nesta versão. Regras específicas de folha, adicionais, feriados ou convenções não são aplicadas."]
+    ];
+    const instructionSheet = XLSX.utils.aoa_to_sheet(instructions);
+    instructionSheet["!cols"] = [{ wch: 24 }, { wch: 105 }];
+    XLSX.utils.book_append_sheet(workbook, instructionSheet, "Instruções");
+
+    workbook.Workbook = workbook.Workbook || {};
+    workbook.Workbook.CalcPr = { calcMode: "auto", fullCalcOnLoad: true, forceFullCalc: true };
+    XLSX.writeFile(workbook, "controle-de-ponto-" + localDateString() + ".xlsx", { bookType: "xlsx", compression: true });
+    showFeedback("Planilha Excel gerada com três abas, filtros mensais e resumo de horas extras.", "success");
   }
 
   form.addEventListener("submit", (event) => {
@@ -334,7 +628,7 @@
     clearFeedback();
   });
 
-  [startDateInput, startTimeInput, endDateInput, endTimeInput].forEach((input) => {
+  [startDateInput, startTimeInput, endDateInput, endTimeInput, intervalInput].forEach((input) => {
     input.addEventListener("input", updateDurationPreview);
     input.addEventListener("change", updateDurationPreview);
   });
@@ -348,7 +642,7 @@
     if (!button) return;
     const record = records.find((item) => item.id === button.dataset.deleteId);
     if (!record) return;
-    if (!window.confirm(`Deseja excluir o lançamento de ${record.fullName || "colaborador"}?`)) return;
+    if (!window.confirm("Deseja excluir o lançamento de " + (record.fullName || "colaborador") + "?")) return;
     records = records.filter((item) => item.id !== button.dataset.deleteId);
     if (persistRecords()) {
       renderRecords();
@@ -356,7 +650,13 @@
     }
   });
 
-  exportButton.addEventListener("click", exportCsv);
+  monthFilter.addEventListener("change", renderRecords);
+  clearFilterButton.addEventListener("click", () => {
+    monthFilter.value = "";
+    renderRecords();
+  });
+  exportButton.addEventListener("click", exportExcel);
+  exportCsvButton.addEventListener("click", exportCsv);
   printButton.addEventListener("click", () => window.print());
 
   document.getElementById("todayLabel").textContent = formatLongDate(new Date());

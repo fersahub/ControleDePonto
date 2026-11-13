@@ -7,6 +7,7 @@
   <meta name="description" content="Formulário de controle de ponto para operações de transporte.">
   <title>Controle de Ponto | Operações</title>
   <link rel="stylesheet" href="assets/css/style.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script src="assets/js/app.js" defer></script>
 </head>
 <body>
@@ -45,9 +46,14 @@
 
       <section class="stats-grid" aria-label="Resumo dos lançamentos">
         <article class="stat-card">
-          <span class="stat-label">Lançamentos salvos</span>
+          <span class="stat-label">Lançamentos no período</span>
           <div class="stat-value" id="totalRecords">0</div>
-          <span class="stat-note">Registros neste navegador</span>
+          <span class="stat-note">Conforme filtro mensal</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Horas extras no período</span>
+          <div class="stat-value stat-value-hours" id="totalOvertime">0h</div>
+          <span class="stat-note">Acima da base de 7h20 por lançamento</span>
         </article>
         <article class="stat-card">
           <span class="stat-label">Lançamentos de hoje</span>
@@ -55,9 +61,9 @@
           <span class="stat-note">Considerando a data inicial</span>
         </article>
         <article class="stat-card">
-          <span class="stat-label">Veículos registrados</span>
+          <span class="stat-label">Veículos no período</span>
           <div class="stat-value" id="vehicleCount">0</div>
-          <span class="stat-note">Placas distintas no histórico</span>
+          <span class="stat-note">Placas distintas no filtro</span>
         </article>
       </section>
 
@@ -107,8 +113,8 @@
               </div>
               <div class="field field-span-2">
                 <label for="interval">Intervalo</label>
-                <input id="interval" name="interval" type="text" placeholder="Ex.: 12:00 às 13:00 ou 1 hora" maxlength="80">
-                <small class="field-hint">Informe o período ou a duração do intervalo, quando houver.</small>
+                <input id="interval" name="interval" type="text" placeholder="Ex.: 01:00, 1h, 60 min ou 12:00 às 13:00" maxlength="80">
+                <small class="field-hint">Pode informar a duração ou a faixa de horário. Campo vazio = sem desconto.</small>
               </div>
               <div class="field">
                 <label for="endDate">Data final <span>*</span></label>
@@ -190,39 +196,51 @@
             <span class="section-index">02</span>
             <div>
               <h2>Histórico de lançamentos</h2>
-              <p>Consulte os registros salvos neste dispositivo.</p>
+              <p>Filtre por mês para consultar ou imprimir os registros do período.</p>
             </div>
           </div>
           <div class="records-actions">
             <button id="printButton" class="button button-outline" type="button">
-              <span aria-hidden="true">⎙</span> Imprimir
+              <span aria-hidden="true">⎙</span> Imprimir período
+            </button>
+            <button id="exportCsvButton" class="button button-outline" type="button">
+              <span aria-hidden="true">↓</span> CSV
             </button>
             <button id="exportButton" class="button button-export" type="button">
-              <span aria-hidden="true">↓</span> Exportar planilha
+              <span aria-hidden="true">▦</span> Exportar Excel
             </button>
           </div>
         </div>
 
         <div class="table-toolbar">
+          <div class="table-filter">
+            <label for="monthFilter">Competência</label>
+            <select id="monthFilter" aria-label="Filtrar lançamentos por mês">
+              <option value="">Todos os meses</option>
+            </select>
+            <button id="clearFilterButton" class="button button-quiet filter-clear" type="button">Limpar filtro</button>
+          </div>
           <div class="table-count"><span class="count-dot"></span><strong id="recordCount">0 registros</strong></div>
-          <p>O arquivo CSV pode ser aberto no Excel ou Google Sheets.</p>
         </div>
+
+        <div id="printReportTitle" class="print-report-title">Relatório de lançamentos</div>
 
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Colaborador</th>
-                <th>Data / horário</th>
-                <th>Serviço</th>
+                <th>Jornada / intervalo</th>
+                <th>Serviço / trajeto</th>
                 <th>Veículo</th>
-                <th>Duração</th>
+                <th>Horas trabalhadas</th>
+                <th>Horas extras</th>
                 <th class="action-column">Ação</th>
               </tr>
             </thead>
             <tbody id="recordsBody">
               <tr class="empty-row">
-                <td colspan="6">
+                <td colspan="7">
                   <div class="empty-state">
                     <span class="empty-icon" aria-hidden="true">▤</span>
                     <strong>Nenhum lançamento por enquanto</strong>
@@ -234,16 +252,18 @@
           </table>
         </div>
         <div class="records-footnote">
-          <span>Armazenamento local</span>
+          <span>Armazenamento local deste navegador</span>
           <span>•</span>
           <span id="lastUpdated">Nenhum registro salvo</span>
+          <span>•</span>
+          <span>Base contratual: 7h20 por lançamento</span>
         </div>
       </section>
     </main>
 
     <footer class="site-footer">
       <span>Controle de Ponto <span class="footer-separator">/</span> Operações</span>
-      <span>Versão inicial · Integração com planilha em próxima etapa</span>
+      <span>Jornada base 7h20 · Relatórios mensais · Exportação Excel</span>
     </footer>
   </div>
 </body>
