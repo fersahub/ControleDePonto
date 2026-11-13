@@ -8,6 +8,9 @@ on:
       - "assets/**"
       - ".github/workflows/deploy.yml"
       - "README.md"
+      - "manifest.webmanifest"
+      - "sw.js"
+      - "tests/**"
   workflow_dispatch:
 
 permissions:
@@ -27,6 +30,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Validar JavaScript
         run: node --check assets/js/app.js
+      - name: Teste estrutural do site
+        run: node tests/smoke-test.js
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
       - name: Preparar arquivos do site
