@@ -38,10 +38,13 @@ jobs:
         run: node tests/core-tests.js
       - name: Instalar navegador para testes
         run: |
-          npm install --no-save playwright@1.56.1
+          mkdir -p /tmp/controle-ponto-tests
+          cd /tmp/controle-ponto-tests
+          npm init -y
+          npm install playwright@1.56.1
           npx playwright install --with-deps chromium
       - name: Testes de interface no navegador
-        run: node tests/browser-tests.js
+        run: NODE_PATH=/tmp/controle-ponto-tests/node_modules node tests/browser-tests.js
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
       - name: Preparar arquivos do site
