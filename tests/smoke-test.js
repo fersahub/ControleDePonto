@@ -24,7 +24,7 @@ const assetRefs = [
 const missingAssets = [...new Set(assetRefs)].filter((ref) => !fs.existsSync(path.join(root, ref.replace(/^\.\//, ""))));
 if (missingAssets.length) throw new Error("Arquivos locais referenciados e ausentes: " + missingAssets.join(", "));
 
-if (!html.includes('assets/js/time-engine.js" defer></script>\\n  <script src="assets/js/app.js"')) throw new Error("O motor de cálculo deve carregar antes do aplicativo.");
+if (html.indexOf('<script src="assets/js/time-engine.js" defer></script>') < 0 || html.indexOf('<script src="assets/js/time-engine.js" defer></script>') > html.indexOf('<script src="assets/js/app.js" defer></script>')) throw new Error("O motor de cálculo deve carregar antes do aplicativo.");
 if (!engine.includes("calculateDailyMetrics") || !engine.includes("parseIntervalMinutes")) throw new Error("Motor de cálculo incompleto.");
 if (manifest.start_url !== "./" || manifest.scope !== "./") throw new Error("Manifesto PWA com escopo inesperado.");
 if (!sw.includes("addAll(APP_SHELL)") || !sw.includes("caches.match(request)")) throw new Error("Service Worker sem cache essencial/offline.");
