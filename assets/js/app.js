@@ -265,6 +265,84 @@
     return "";
   }
 
+  function normalizeRegistration(value) {
+    return String(value || "").trim().replace(/\\s+/g, " ").toLocaleUpperCase("pt-BR");
+  }
+
+  function getRecordPeriod(record) {
+    const start = parseLocalDateTime(record.startDate, record.startTime);
+    const end = parseLocalDateTime(record.endDate, record.endTime);
+    if (!start || !end || end <= start) return null;
+    return { start: start.getTime(), end: end.getTime() };
+  }
+
+  function findRecordConflicts(record) {
+    const registration = normalizeRegistration(record.registration);
+    const period = getRecordPeriod(record);
+    const duplicates = [];
+    const overlaps = [];
+
+    if (!registration || !period) return { duplicates, overlaps };
+
+    records.forEach((existing) => {
+      if (normalizeRegistration(existing.registration) !== registration) return;
+
+      const existingPeriod = getRecordPeriod(existing);
+      if (!existingPeriod) return;
+
+      const isSamePeriod = period.start === existingPeriod.start && period.end === existingPeriod.end;
+      if (isSamePeriod) {
+        duplicates.push(existing);
+        return;
+      }
+
+      const hasOverlap = period.start < existingPeriod.end && period.end > existingPeriod.start;
+      if (hasOverlap) overlaps.push(existing);
+    });
+
+    return { duplicates, overlaps };
+  }
+
+  function formatConflictEntries(conflictingRecords) {
+    const lines = conflictingRecords.slice(0, 3).map((record) =>
+      "• " + formatDate(record.startDate) + " " + (record.startTime || "—") +
+      " até " + formatDate(record.endDate) + " " + (record.endTime || "—") +
+      (record.serviceType ? " · " + record.serviceType : "")
+    );
+
+    if (conflictingRecords.length > 3) {
+      lines.push("e mais " + (conflictingRecords.length - 3) + " registro(s).");
+    }
+
+    return lines.join("\\n");
+  }
+
+  function confirmRecordConflicts(record) {
+    const conflicts = findRecordConflicts(record);
+    const sections = [];
+
+    if (conflicts.duplicates.length) {
+      sections.push(
+        "POSSÍVEL LANÇAMENTO DUPLICADO\\n" +
+        "Já existe registro(s) para esta matrícula com o mesmo início e término:\\n" +
+        formatConflictEntries(conflicts.duplicates)
+      );
+    }
+
+    if (conflicts.overlaps.length) {
+      sections.push(
+        "POSSÍVEL SOBREPOSIÇÃO DE JORNADA\\n" +
+        "O período informado se cruza com outro(s) lançamento(s) desta matrícula:\\n" +
+        formatConflictEntries(conflicts.overlaps)
+      );
+    }
+
+    if (!sections.length) return true;
+
+    sections.push("Deseja salvar mesmo assim? A gravação só será feita com sua confirmação.");
+    return window.confirm(sections.join("\\n\\n"));
+  }
+
   function createCell(text, className) {
     const cell = document.createElement("td");
     if (className) cell.className = className;
@@ -754,6 +832,11 @@
       showFeedback(validationMessage, "error");
       const firstInvalid = form.querySelector(":invalid");
       if (firstInvalid && !firstInvalid.disabled) firstInvalid.focus();
+      return;
+    }
+
+    if (!confirmRecordConflicts(record)) {
+      showFeedback("Lançamento não salvo. A gravação foi cancelada após a identificação de conflito.", "error");
       return;
     }
 
