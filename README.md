@@ -7,11 +7,13 @@ Formulário web para lançamento, consulta e exportação de registros de jornad
 - Cadastro de colaborador, matrícula, datas e horários de início e término.
 - Registro do intervalo, ordem do veículo, placa e tipo de serviço.
 - Plantão oculta Origem, Destino, Nº de ordem do veículo e Placa; esses quatro campos ficam desativados e não são exigidos nem gravados no novo lançamento. Viagem exibe e exige todos eles.
+- Intervalo registra início e término, sem contabilizar horas trabalhadas ou extras.
+- Folga registra somente colaborador, matrícula e data, sem exigir horários e sem alterar a apuração da jornada.
 - Validação de datas, horários e duração do intervalo.
 - Verificação de possíveis lançamentos duplicados e jornadas sobrepostas para a mesma matrícula, com confirmação antes de gravar registros conflitantes.
 - Cálculo da jornada líquida e apuração diária de horas extras por matrícula + data inicial, com distribuição cronológica entre lançamentos.
 - Filtro mensal no histórico do site; a impressão respeita o mês selecionado.
-- Espelho mensal individual no site, com seleção de competência e matrícula, resumo de horas e detalhamento diário, pronto para impressão.
+- Espelho mensal individual no site, com seleção de competência e matrícula, resumo de horas e detalhamento diário, incluindo folgas e intervalos não contabilizados, pronto para impressão.
 - Exportação para Excel (.xlsx) com quatro abas: **Lançamentos**, **Resumo mensal**, **Resumo por colaborador** e **Instruções**.
 - Resumo individual agrupado por competência + matrícula, com lançamentos, plantões, viagens, jornada bruta, horas trabalhadas e horas extras.
 - Filtros automáticos por competência, colaborador e matrícula no resumo individual; para impressão, aplique os filtros e use Arquivo → Imprimir, preferencialmente em A4 e orientação paisagem.
@@ -28,6 +30,8 @@ Formulário web para lançamento, consulta e exportação de registros de jornad
 - Para exibir os valores por lançamento, o sistema distribui primeiro as horas normais em ordem cronológica até completar 7h20; o restante é classificado como extra.
 - Jornadas que atravessam a meia-noite são integralmente atribuídas à data inicial, conforme regra operacional definida.
 - O intervalo pode ser informado como duração (por exemplo, `01:00`, `1h`, `60 min`) ou como faixa (por exemplo, `12:00 às 13:00`). Em branco equivale a nenhum intervalo descontado.
+
+Intervalos e folgas aparecem nos relatórios e exportações, mas não entram nos totais de horas trabalhadas, normais ou extras.
 
 A competência mensal usa o mês da **Data inicial** do lançamento. A apuração diária agrupa por matrícula + data inicial. Se houver vários lançamentos no mesmo dia, a jornada normal de 7h20 é compartilhada entre eles, em ordem cronológica; o excedente diário é classificado como hora extra. Jornadas que atravessam a meia-noite são integralmente atribuídas à data inicial e não são divididas entre datas.
 
