@@ -6,7 +6,7 @@ Formulário web para lançamento, consulta e exportação de registros de jornad
 
 - Cadastro de colaborador, matrícula, datas e horários de início e término.
 - Registro do intervalo, ordem do veículo, placa e tipo de serviço.
-- Plantão oculta Origem e Destino; Viagem exibe e exige os dois campos.
+- Plantão oculta Origem, Destino, Nº de ordem do veículo e Placa; esses quatro campos ficam desativados e não são exigidos nem gravados no novo lançamento. Viagem exibe e exige todos eles.
 - Validação de datas, horários e duração do intervalo.
 - Cálculo da jornada líquida e das horas extras.
 - Filtro mensal no histórico do site; a impressão respeita o mês selecionado.
