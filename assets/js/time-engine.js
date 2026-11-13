@@ -8,18 +8,18 @@
   const DEFAULT_DAILY_TARGET_MINUTES = 440;
 
   function normalizeRegistration(value) {
-    return String(value || "").trim().replace(/\\s+/g, " ").toLocaleUpperCase("pt-BR");
+    return String(value || "").trim().replace(/\s+/g, " ").toLocaleUpperCase("pt-BR");
   }
 
   function isValidDateString(value) {
-    if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const [year, month, day] = value.split("-").map(Number);
     const date = new Date(year, month - 1, day, 12, 0, 0);
     return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
   }
 
   function parseLocalDateTime(dateValue, timeValue) {
-    if (!isValidDateString(dateValue) || typeof timeValue !== "string" || !/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(timeValue)) return null;
+    if (!isValidDateString(dateValue) || typeof timeValue !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(timeValue)) return null;
     const date = new Date(dateValue + "T" + timeValue + ":00");
     if (Number.isNaN(date.getTime())) return null;
     if (date.getFullYear() !== Number(dateValue.slice(0, 4)) ||
@@ -32,7 +32,7 @@
     const input = String(value || "").trim().toLowerCase();
     if (!input) return 0;
 
-    let match = input.match(/(\\d{1,2}):([0-5]\\d)\\s*(?:às|as|a|[-–—])\\s*(\\d{1,2}):([0-5]\\d)/i);
+    let match = input.match(/(\d{1,2}):([0-5]\d)\s*(?:às|as|a|[-–—])\s*(\d{1,2}):([0-5]\d)/i);
     if (match) {
       const startHour = Number(match[1]);
       const startMinute = Number(match[2]);
@@ -44,13 +44,13 @@
       return (end - start + 1440) % 1440;
     }
 
-    match = input.match(/^(\\d{1,3}):([0-5]\\d)$/);
+    match = input.match(/^(\d{1,3}):([0-5]\d)$/);
     if (match) return Number(match[1]) * 60 + Number(match[2]);
 
-    match = input.match(/^(\\d+(?:[.,]\\d+)?)\\s*(?:h|hora|horas)$/i);
+    match = input.match(/^(\d+(?:[.,]\d+)?)\s*(?:h|hora|horas)$/i);
     if (match) return Math.round(Number(match[1].replace(",", ".")) * 60);
 
-    match = input.match(/^(\\d+)\\s*(?:min|minuto|minutos)$/i);
+    match = input.match(/^(\d+)\s*(?:min|minuto|minutos)$/i);
     if (match) return Number(match[1]);
 
     return null;
