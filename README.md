@@ -1,6 +1,6 @@
-# Controle de Ponto
+# Meu Controle de Jornada
 
-Formulário web para lançamento, consulta e exportação de registros de jornada em operações de transporte.
+Aplicativo pessoal, estático e instalável para registrar jornadas, intervalos, folgas e horas extras. O projeto funciona no GitHub Pages sem servidor ou conta de usuário; os dados permanecem no navegador.
 
 ## Funcionalidades
 
@@ -19,6 +19,8 @@ Formulário web para lançamento, consulta e exportação de registros de jornad
 - Filtros automáticos por competência, colaborador e matrícula no resumo individual; para impressão, aplique os filtros e use Arquivo → Imprimir, preferencialmente em A4 e orientação paisagem.
 - Filtro automático por coluna na planilha, incluindo Competência (mês).
 - Exportação alternativa em CSV.
+- Backup completo em JSON, incluindo lançamentos e jornadas personalizadas, com restauração validada e confirmação antes de substituir os dados.
+- Aplicativo preparado para uso offline após a primeira visita, por meio de Service Worker e cache dos arquivos essenciais.
 
 ## Critério de horas extras
 
@@ -62,3 +64,17 @@ O cálculo é operacional, baseado na jornada configurada de 7h20 e no intervalo
 ## Jornadas personalizadas
 
 Na seção **Minha jornada personalizada**, informe a matrícula e escolha a carga diária esperada: 4h, 6h, 7h20, 8h, 12h ou uma carga personalizada em HH:MM. A configuração fica salva localmente neste navegador e é aplicada aos lançamentos daquela matrícula, inclusive aos registros anteriores, atualizando a apuração de horas normais e extras, histórico, espelho mensal e exportações. Matrículas sem configuração continuam usando 7h20. Use **Usar padrão** para remover a personalização. Para escalas como 12x36, configure 12h como referência por dia trabalhado; esta versão não cria automaticamente o calendário alternado de trabalho e descanso.
+
+
+## Backup, restauração e modo offline
+
+Use **Baixar backup completo** para salvar um arquivo JSON com todos os lançamentos e as jornadas personalizadas. Para recuperar ou transferir os dados, use **Restaurar backup** em outro navegador e selecione o arquivo. A restauração substitui os dados locais existentes e pede confirmação antes de prosseguir.
+
+O site pode ser instalado como aplicativo e abrir offline depois que os arquivos essenciais forem carregados uma primeira vez. A exportação CSV, os registros e os relatórios locais não dependem de servidor. A exportação Excel utiliza a biblioteca SheetJS carregada por CDN e, portanto, precisa de conexão com a internet se a biblioteca ainda não estiver em cache.
+
+## Limites desta versão pessoal
+
+- Os dados ficam exclusivamente no armazenamento local do navegador. Não existe login, sincronização entre dispositivos, compartilhamento ou backup automático em nuvem.
+- A limpeza dos dados do navegador, perda do dispositivo ou falha física pode causar perda dos registros; mantenha cópias de backup fora do navegador.
+- O aplicativo é um organizador pessoal de jornada e não deve ser apresentado como sistema oficial de registro eletrônico de ponto nem como substituto de obrigações legais trabalhistas.
+- A jornada personalizada desta versão define uma carga diária por matrícula. Calendários semanais/cíclicos (5x2, 6x1, 12x36), feriados, adicional noturno, DSR e regras de convenções ainda não são calculados automaticamente.
