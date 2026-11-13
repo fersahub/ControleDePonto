@@ -10,7 +10,9 @@ Formulário web para lançamento, consulta e exportação de registros de jornad
 - Validação de datas, horários e duração do intervalo.
 - Cálculo da jornada líquida e das horas extras.
 - Filtro mensal no histórico do site; a impressão respeita o mês selecionado.
-- Exportação para Excel (.xlsx) com três abas: **Lançamentos**, **Resumo mensal** e **Instruções**.
+- Exportação para Excel (.xlsx) com quatro abas: **Lançamentos**, **Resumo mensal**, **Resumo por colaborador** e **Instruções**.
+- Resumo individual agrupado por competência + matrícula, com lançamentos, plantões, viagens, jornada bruta, horas trabalhadas e horas extras.
+- Filtros automáticos por competência, colaborador e matrícula no resumo individual; a impressão pode ser feita após aplicar os filtros.
 - Filtro automático por coluna na planilha, incluindo Competência (mês).
 - Exportação alternativa em CSV.
 
