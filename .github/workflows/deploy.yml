@@ -32,6 +32,8 @@ jobs:
         run: node --check assets/js/app.js
       - name: Teste estrutural do site
         run: node tests/smoke-test.js
+      - name: Testes de cálculos e jornadas
+        run: node tests/core-tests.js
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
       - name: Preparar arquivos do site
