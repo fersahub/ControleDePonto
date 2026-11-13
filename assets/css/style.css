@@ -295,3 +295,6 @@ tbody tr:last-child td { border-bottom: 0; }
   body.printing-individual-report .individual-table th,
   body.printing-individual-report .individual-table td { padding: 6px 5px; font-size: 8px; }
 }
+
+.service-pill.folga { color: #64748b; background: #eef1f5; }
+.service-pill.intervalo { color: #16756a; background: #e8f6f3; }
