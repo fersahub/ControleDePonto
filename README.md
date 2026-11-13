@@ -8,6 +8,7 @@ Formulário web para lançamento, consulta e exportação de registros de jornad
 - Registro do intervalo, ordem do veículo, placa e tipo de serviço.
 - Plantão oculta Origem, Destino, Nº de ordem do veículo e Placa; esses quatro campos ficam desativados e não são exigidos nem gravados no novo lançamento. Viagem exibe e exige todos eles.
 - Validação de datas, horários e duração do intervalo.
+- Verificação de possíveis lançamentos duplicados e jornadas sobrepostas para a mesma matrícula, com confirmação antes de gravar registros conflitantes.
 - Cálculo da jornada líquida e das horas extras.
 - Filtro mensal no histórico do site; a impressão respeita o mês selecionado.
 - Exportação para Excel (.xlsx) com quatro abas: **Lançamentos**, **Resumo mensal**, **Resumo por colaborador** e **Instruções**.
@@ -26,6 +27,10 @@ Formulário web para lançamento, consulta e exportação de registros de jornad
 - O intervalo pode ser informado como duração (por exemplo, `01:00`, `1h`, `60 min`) ou como faixa (por exemplo, `12:00 às 13:00`). Em branco equivale a nenhum intervalo descontado.
 
 A competência mensal usa o mês da **Data inicial** do lançamento. O cálculo considera cada lançamento como uma unidade de apuração e não distribui automaticamente jornadas que atravessam vários dias.
+
+## Verificação de conflitos
+
+Antes de salvar, o sistema compara a matrícula e o período informado com os registros já existentes neste navegador. Mesmo início e término para a mesma matrícula são tratados como possível duplicidade; períodos que se cruzam são sinalizados como possível sobreposição. Em ambos os casos, o usuário pode cancelar a gravação ou confirmar que deseja prosseguir. Lançamentos distintos e sequenciais são permitidos. A verificação não identifica colaboradores por nome, e sim pela matrícula.
 
 ## Publicação no GitHub Pages
 
