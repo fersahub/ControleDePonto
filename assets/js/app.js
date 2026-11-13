@@ -316,13 +316,13 @@
 
     renderRecords();
     form.reset();
-    toggleRouteFields();
-    updateDurationPreview();
-    showFeedback("Lançamento salvo com sucesso neste navegador.", "success");
+    window.setTimeout(() => showFeedback("Lançamento salvo com sucesso neste navegador.", "success"), 0);
   });
 
   form.addEventListener("reset", () => {
     window.setTimeout(() => {
+      startDateInput.value = localDateString();
+      endDateInput.value = localDateString();
       clearFeedback();
       toggleRouteFields();
       updateDurationPreview();
