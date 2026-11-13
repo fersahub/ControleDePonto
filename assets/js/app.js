@@ -376,7 +376,7 @@
       return sum + (metrics.error ? 0 : metrics.overtimeMinutes);
     }, 0);
     document.getElementById("totalRecords").textContent = String(visibleRecords.length);
-    document.getElementById("totalOvertime").textContent = formatMinutes(overtimeTotal).replace("min", "").trim();
+    document.getElementById("totalOvertime").textContent = formatMinutes(overtimeTotal);
     document.getElementById("todayRecords").textContent = String(visibleRecords.filter((item) => item.startDate === today).length);
     document.getElementById("vehicleCount").textContent = String(new Set(visibleRecords.map((item) => (item.plate || "").toUpperCase()).filter(Boolean)).size);
     document.getElementById("recordCount").textContent = visibleRecords.length + " " + (visibleRecords.length === 1 ? "registro" : "registros");
