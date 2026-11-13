@@ -103,24 +103,24 @@
               <h3>Informações da jornada</h3>
             </div>
             <div class="form-grid">
-              <div class="field">
+              <div class="field" id="startDateField">
                 <label for="startDate">Data inicial <span>*</span></label>
                 <input id="startDate" name="startDate" type="date" required>
               </div>
-              <div class="field">
+              <div class="field" id="startTimeField">
                 <label for="startTime">Horário inicial <span>*</span></label>
                 <input id="startTime" name="startTime" type="time" required>
               </div>
-              <div class="field field-span-2">
-                <label for="interval">Intervalo</label>
+              <div class="field field-span-2" id="intervalField">
+                <label for="interval">Intervalo descontado da jornada</label>
                 <input id="interval" name="interval" type="text" placeholder="Ex.: 01:00, 1h, 60 min ou 12:00 às 13:00" maxlength="80">
                 <small class="field-hint">Pode informar a duração ou a faixa de horário. Campo vazio = sem desconto.</small>
               </div>
-              <div class="field">
+              <div class="field" id="endDateField">
                 <label for="endDate">Data final <span>*</span></label>
                 <input id="endDate" name="endDate" type="date" required>
               </div>
-              <div class="field">
+              <div class="field" id="endTimeField">
                 <label for="endTime">Horário final <span>*</span></label>
                 <input id="endTime" name="endTime" type="time" required>
               </div>
@@ -147,6 +147,8 @@
                   <option value="">Selecione o tipo de serviço</option>
                   <option value="Plantão">Plantão</option>
                   <option value="Viagem">Viagem</option>
+                  <option value="Intervalo">Intervalo</option>
+                  <option value="Folga">Folga</option>
                 </select>
               </div>
             </div>
