@@ -1190,8 +1190,7 @@
   });
 
   schedulePreset.addEventListener("change", () => customScheduleField.classList.toggle("is-hidden", schedulePreset.value !== "custom"));
-  scheduleRegistrationInput.addEventListener("blur", refreshScheduleForm);
-  scheduleRegistrationInput.addEventListener("change", refreshScheduleForm);
+  scheduleRegistrationInput.addEventListener("input", refreshScheduleForm);
   document.getElementById("saveScheduleButton").addEventListener("click", () => {
     const key = normalizeRegistration(scheduleRegistrationInput.value);
     if (!key) { scheduleFeedback.textContent = "Informe a matrícula para salvar uma jornada."; scheduleRegistrationInput.focus(); return; }
