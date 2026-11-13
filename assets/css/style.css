@@ -311,3 +311,14 @@ tbody tr:last-child td { border-bottom: 0; }
 .schedule-note { color: #8995a4; font-size: 9px; line-height: 1.6; }
 @media (max-width: 900px) { .schedule-controls { grid-template-columns: repeat(2,minmax(0,1fr)); } .schedule-actions { grid-column: span 2; justify-content: flex-end; } }
 @media (max-width: 540px) { .schedule-panel { padding: 18px 14px; } .schedule-controls { grid-template-columns: 1fr; } .schedule-actions { grid-column: auto; } .schedule-actions .button { flex: 1; } }
+
+
+/* Backup e restauração */
+.backup-panel { margin-bottom: 18px; padding: 20px 24px 16px; }
+.backup-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.backup-note { margin: 12px 0 0; color: #8995a4; font-size: 9px; line-height: 1.6; }
+@media (max-width: 540px) {
+  .backup-panel { padding: 18px 14px; }
+  .backup-actions { display: grid; grid-template-columns: 1fr; }
+  .backup-actions .button { width: 100%; min-height: 40px; }
+}
