@@ -68,6 +68,112 @@
     scheduleFeedback.textContent = key ? "Jornada atual: "+formatTarget(target)+" por dia"+(schedules[key] ? " (personalizada)." : " (padrão).") : "A jornada padrão é de 7h20 por dia. Informe uma matrícula para personalizar.";
   }
 
+
+  function downloadJsonFile(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportBackup() {
+    const backup = {
+      application: "controle-de-ponto",
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      records,
+      schedules
+    };
+    downloadJsonFile("backup-controle-de-jornada-" + localDateString() + ".json", backup);
+    showFeedback("Backup completo gerado. Guarde o arquivo em local seguro.", "success");
+  }
+
+  function normalizeBackupRecords(items) {
+    const validTypes = ["Plantão", "Viagem", "Intervalo", "Folga"];
+    const usedIds = new Set();
+    const normalized = [];
+    let rejected = 0;
+    items.forEach((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) { rejected += 1; return; }
+      const registration = String(item.registration || "").trim();
+      const startDate = String(item.startDate || "");
+      const service = String(item.serviceType || "");
+      if (!registration || !/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) || !validTypes.includes(service)) { rejected += 1; return; }
+      let id = String(item.id || "");
+      if (!id || usedIds.has(id)) id = "restaurado-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+      usedIds.add(id);
+      const stringValue = (value) => typeof value === "string" ? value : "";
+      normalized.push({
+        id,
+        fullName: stringValue(item.fullName).trim(),
+        registration,
+        startDate,
+        startTime: stringValue(item.startTime),
+        interval: stringValue(item.interval),
+        endDate: stringValue(item.endDate),
+        endTime: stringValue(item.endTime),
+        vehicleOrder: stringValue(item.vehicleOrder),
+        plate: stringValue(item.plate).toUpperCase(),
+        serviceType: service,
+        origin: stringValue(item.origin),
+        destination: stringValue(item.destination),
+        createdAt: stringValue(item.createdAt) || new Date().toISOString()
+      });
+    });
+    return { records: normalized, rejected };
+  }
+
+  async function importBackup(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("O arquivo ultrapassa o limite de 10 MB.");
+      const backup = JSON.parse(await file.text());
+      if (!backup || backup.application !== "controle-de-ponto" || backup.backupVersion !== 1 ||
+          !Array.isArray(backup.records) || !backup.schedules || typeof backup.schedules !== "object" || Array.isArray(backup.schedules)) {
+        throw new Error("Este arquivo não é um backup válido do ControleDePonto.");
+      }
+      const normalized = normalizeBackupRecords(backup.records);
+      if (backup.records.length && !normalized.records.length) throw new Error("Nenhum lançamento válido foi encontrado no backup.");
+      const restoredSchedules = {};
+      Object.entries(backup.schedules).forEach(([registration, minutes]) => {
+        const key = normalizeRegistration(registration);
+        const value = Number(minutes);
+        if (key && Number.isInteger(value) && value > 0 && value <= 1440) restoredSchedules[key] = value;
+      });
+      if (!window.confirm("A restauração substituirá todos os lançamentos e jornadas salvos neste navegador. Recomenda-se baixar um backup atual antes de continuar. Deseja prosseguir?")) return;
+
+      const previousRecords = localStorage.getItem(STORAGE_KEY);
+      const previousSchedules = localStorage.getItem(SCHEDULES_KEY);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized.records));
+        localStorage.setItem(SCHEDULES_KEY, JSON.stringify(restoredSchedules));
+      } catch (storageError) {
+        if (previousRecords === null) localStorage.removeItem(STORAGE_KEY); else localStorage.setItem(STORAGE_KEY, previousRecords);
+        if (previousSchedules === null) localStorage.removeItem(SCHEDULES_KEY); else localStorage.setItem(SCHEDULES_KEY, previousSchedules);
+        throw new Error("Não foi possível restaurar os dados neste navegador. " + storageError.message);
+      }
+      records = normalized.records;
+      Object.keys(schedules).forEach((key) => delete schedules[key]);
+      Object.assign(schedules, restoredSchedules);
+      renderRecords();
+      updateDurationPreview();
+      refreshScheduleForm();
+      individualReportOutput.classList.add("is-hidden");
+      showFeedback("Backup restaurado: " + records.length + " lançamento(s) e " + Object.keys(schedules).length + " jornada(s)." +
+        (normalized.rejected ? " " + normalized.rejected + " registro(s) inválido(s) foram ignorados." : ""), "success");
+    } catch (error) {
+      showFeedback(error.message || "Não foi possível ler o arquivo de backup.", "error");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
   function persistRecords() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
@@ -567,7 +673,7 @@
     document.getElementById("totalRecords").textContent = String(visibleRecords.length);
     document.getElementById("totalOvertime").textContent = formatMinutes(overtimeTotal);
     document.getElementById("todayRecords").textContent = String(visibleRecords.filter((item) => item.startDate === today).length);
-    document.getElementById("vehicleCount").textContent = String(new Set(visibleRecords.map((item) => (item.plate || "").toUpperCase()).filter(Boolean)).size);
+    document.getElementById("vehicleCount").textContent = String(new Set(visibleRecords.map((item) => item.startDate).filter(Boolean)).size);
     document.getElementById("recordCount").textContent = visibleRecords.length + " " + (visibleRecords.length === 1 ? "registro" : "registros");
 
     const periodLabel = monthFilter.value ? formatMonth(monthFilter.value) : "Todos os meses";
@@ -1213,6 +1319,9 @@
     monthFilter.value = "";
     renderRecords();
   });
+  document.getElementById("exportBackupButton").addEventListener("click", exportBackup);
+  document.getElementById("importBackupButton").addEventListener("click", () => document.getElementById("backupFileInput").click());
+  document.getElementById("backupFileInput").addEventListener("change", importBackup);
   exportButton.addEventListener("click", exportExcel);
   exportCsvButton.addEventListener("click", exportCsv);
   printButton.addEventListener("click", () => window.print());
@@ -1225,4 +1334,7 @@
   updateDurationPreview();
   renderRecords();
   updateIndividualMonthOptions();
+  if ("serviceWorker" in navigator && window.location.protocol === "https:") {
+    navigator.serviceWorker.register("./sw.js").catch((error) => console.warn("Não foi possível ativar o modo offline.", error));
+  }
 })();
