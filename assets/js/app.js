@@ -149,7 +149,7 @@
       Object.entries(backup.schedules).forEach(([registration, minutes]) => {
         const key = normalizeRegistration(registration);
         const value = Number(minutes);
-        if (key && Number.isInteger(value) && value > 0 && value <= 1440) restoredSchedules[key] = value;
+        if (key && Number.isInteger(value) && value > 0 && value < 1440) restoredSchedules[key] = value;
       });
       if (!window.confirm("A restauração substituirá todos os lançamentos e jornadas salvos neste navegador. Recomenda-se baixar um backup atual antes de continuar. Deseja prosseguir?")) return;
 
