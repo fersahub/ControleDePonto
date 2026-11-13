@@ -145,6 +145,30 @@
     };
   }
 
+  // Apura por matrícula + data inicial e distribui a cota diária em ordem cronológica.
+  function calculateDailyMetrics(sourceRecords) {
+    const result = new Map();
+    const dailyTotals = new Map();
+    const ordered = [...sourceRecords].sort((a, b) => {
+      const left = (a.startDate || "") + " " + (a.startTime || "");
+      const right = (b.startDate || "") + " " + (b.startTime || "");
+      return left.localeCompare(right);
+    });
+    ordered.forEach((record) => {
+      const rawMetrics = getWorkMetrics(record);
+      if (rawMetrics.error) { result.set(record, rawMetrics); return; }
+      const dailyKey = normalizeRegistration(record.registration) + "|" + (record.startDate || "");
+      const alreadyAllocated = dailyTotals.get(dailyKey) || 0;
+      const regularMinutes = Math.min(rawMetrics.workedMinutes, Math.max(0, CONTRACT_MINUTES - alreadyAllocated));
+      const overtimeMinutes = rawMetrics.workedMinutes - regularMinutes;
+      dailyTotals.set(dailyKey, alreadyAllocated + rawMetrics.workedMinutes);
+      result.set(record, { ...rawMetrics, regularMinutes, overtimeMinutes,
+        dailyWorkedMinutes: alreadyAllocated + rawMetrics.workedMinutes,
+        dailyOvertimeMinutes: Math.max(0, alreadyAllocated + rawMetrics.workedMinutes - CONTRACT_MINUTES) });
+    });
+    return result;
+  }
+
   function formatLongDate(date) {
     return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(date);
   }
@@ -202,13 +226,12 @@
       return;
     }
 
-    const metrics = getWorkMetrics({
-      startDate: startDateInput.value,
-      startTime: startTimeInput.value,
-      endDate: endDateInput.value,
-      endTime: endTimeInput.value,
-      interval: intervalInput.value
-    });
+    const previewRecord = {
+      registration: document.getElementById("registration").value,
+      startDate: startDateInput.value, startTime: startTimeInput.value,
+      endDate: endDateInput.value, endTime: endTimeInput.value, interval: intervalInput.value
+    };
+    const metrics = calculateDailyMetrics([...records, previewRecord]).get(previewRecord);
     if (metrics.error) {
       durationPreview.classList.remove("is-ready");
       durationPreview.textContent = metrics.error;
@@ -394,6 +417,7 @@
   function renderRecords() {
     updateMonthFilterOptions();
     const visibleRecords = getVisibleRecords();
+    const dailyMetrics = calculateDailyMetrics(records);
     recordsBody.replaceChildren();
 
     if (visibleRecords.length === 0) {
@@ -419,7 +443,7 @@
       recordsBody.append(row);
     } else {
       visibleRecords.forEach((record) => {
-        const metrics = getWorkMetrics(record);
+        const metrics = dailyMetrics.get(record) || getWorkMetrics(record);
         const row = document.createElement("tr");
 
         row.append(createStackCell(record.fullName || "—", "Matrícula: " + (record.registration || "—"), "person-cell"));
@@ -466,7 +490,7 @@
 
     const today = localDateString();
     const overtimeTotal = visibleRecords.reduce((sum, record) => {
-      const metrics = getWorkMetrics(record);
+      const metrics = dailyMetrics.get(record) || getWorkMetrics(record);
       return sum + (metrics.error ? 0 : metrics.overtimeMinutes);
     }, 0);
     document.getElementById("totalRecords").textContent = String(visibleRecords.length);
@@ -508,8 +532,9 @@
       "Jornada bruta (horas)", "Horas trabalhadas (horas)", "Base contratual (horas)",
       "Horas normais (horas)", "Horas extras (horas)"
     ];
+    const dailyMetrics = calculateDailyMetrics(records);
     const rows = records.map((record) => {
-      const metrics = getWorkMetrics(record);
+      const metrics = dailyMetrics.get(record) || getWorkMetrics(record);
       if (metrics.error) return [];
       return [
         monthKey(record.startDate), record.fullName, record.registration, formatDate(record.startDate),
@@ -565,8 +590,9 @@
       "Horas extras", "Lançado em"
     ];
 
+    const dailyMetrics = calculateDailyMetrics(sortedRecords);
     const rows = sortedRecords.map((record) => {
-      const metrics = getWorkMetrics(record);
+      const metrics = dailyMetrics.get(record) || getWorkMetrics(record);
       if (metrics.error) return null;
       return [
         monthKey(record.startDate),
@@ -630,7 +656,7 @@
       const excelRow = index + 2;
       const monthRecords = sortedRecords.filter((record) => monthKey(record.startDate) === month);
       const totals = monthRecords.reduce((acc, record) => {
-        const metrics = getWorkMetrics(record);
+        const metrics = dailyMetrics.get(record) || getWorkMetrics(record);
         if (!metrics.error) {
           acc.worked += metrics.workedMinutes;
           acc.overtime += metrics.overtimeMinutes;
@@ -662,7 +688,7 @@
     // Uma linha por competência + matrícula, para filtrar e imprimir o resumo individual.
     const employeeGroups = new Map();
     sortedRecords.forEach((record) => {
-      const metrics = getWorkMetrics(record);
+      const metrics = dailyMetrics.get(record) || getWorkMetrics(record);
       if (metrics.error) return;
       const month = monthKey(record.startDate);
       const registration = String(record.registration || "").trim();
@@ -805,9 +831,10 @@
       ["Jornada bruta", "Diferença entre a data/hora final e a data/hora inicial."],
       ["Intervalo", "O intervalo informado é descontado da jornada bruta. Formatos aceitos no site: 01:00, 1h, 60 min ou 12:00 às 13:00. Campo vazio equivale a zero."],
       ["Horas trabalhadas", "Jornada bruta menos intervalo descontado."],
-      ["Base contratual", "7 horas e 20 minutos por lançamento."],
-      ["Horas extras", "Somente o tempo que exceder 7h20 de horas trabalhadas líquidas em cada lançamento."],
-      ["Horas normais", "Limitadas a 7h20 por lançamento. O excedente aparece na coluna Horas extras."],
+      ["Base contratual", "7 horas e 20 minutos por colaborador em cada data inicial. A base é diária e compartilhada pelos lançamentos do mesmo dia."],
+      ["Horas extras", "Apuradas sobre o total de horas líquidas do colaborador em cada data inicial. O limite diário é 7h20; os excedentes são distribuídos cronologicamente entre os lançamentos."],
+      ["Horas normais", "Até completar 7h20 no total diário por matrícula. Lançamentos posteriores no mesmo dia recebem somente a parcela que exceder a cota diária restante."],
+      ["Jornadas após meia-noite", "Todo o período líquido do lançamento é atribuído à data inicial, conforme regra operacional configurada."],
       ["Competência", "Mês e ano da Data inicial do lançamento."],
       ["Armazenamento", "A exportação contém os registros guardados no navegador em que o site foi utilizado. Esta versão ainda não sincroniza dados entre computadores."],
       ["Observação", "O cálculo é operacional, com base nos critérios configurados nesta versão. Regras específicas de folha, adicionais, feriados ou convenções não são aplicadas."]
@@ -819,7 +846,7 @@
     workbook.Workbook = workbook.Workbook || {};
     workbook.Workbook.CalcPr = { calcMode: "auto", fullCalcOnLoad: true, forceFullCalc: true };
     XLSX.writeFile(workbook, "controle-de-ponto-" + localDateString() + ".xlsx", { bookType: "xlsx", compression: true });
-    showFeedback("Planilha Excel gerada com três abas, filtros mensais e resumo de horas extras.", "success");
+    showFeedback("Planilha Excel gerada com quatro abas, filtros mensais e apuração diária de horas extras.", "success");
   }
 
   form.addEventListener("submit", (event) => {
