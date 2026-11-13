@@ -28,6 +28,7 @@ const engineScriptIndex = html.indexOf('<script src="assets/js/time-engine.js" d
 const appScriptIndex = html.indexOf('<script src="assets/js/app.js" defer></script>');
 if (engineScriptIndex < 0 || appScriptIndex < 0 || engineScriptIndex > appScriptIndex) throw new Error("O motor de cálculo deve carregar antes do aplicativo.");
 if (!engine.includes("calculateDailyMetrics") || !engine.includes("parseIntervalMinutes")) throw new Error("Motor de cálculo incompleto.");
+if (!manifest.icons.some((icon) => icon.sizes === "192x192") || !manifest.icons.some((icon) => icon.sizes === "512x512")) throw new Error("O manifesto precisa declarar ícones de 192px e 512px.");
 if (manifest.start_url !== "./" || manifest.scope !== "./") throw new Error("Manifesto PWA com escopo inesperado.");
 if (!sw.includes("addAll(APP_SHELL)") || !sw.includes("caches.match(request)")) throw new Error("Service Worker sem cache essencial/offline.");
 for (const required of ["exportBackup", "importBackup", "calculateDailyMetrics", "generateIndividualReport"]) {
