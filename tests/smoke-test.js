@@ -8,19 +8,19 @@ const js = read("assets/js/app.js");
 const manifest = JSON.parse(read("manifest.webmanifest"));
 const sw = read("sw.js");
 
-const ids = [...html.matchAll(/\\bid=["']([^"']+)["']/g)].map((match) => match[1]);
+const ids = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map((match) => match[1]);
 const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
 if (duplicateIds.length) throw new Error("IDs HTML duplicados: " + [...new Set(duplicateIds)].join(", "));
 
-const referencedIds = [...js.matchAll(/getElementById\\(["']([^"']+)["']\\)/g)].map((match) => match[1]);
+const referencedIds = [...js.matchAll(/getElementById\(["']([^"']+)["']\)/g)].map((match) => match[1]);
 const missingIds = [...new Set(referencedIds)].filter((id) => !ids.includes(id));
 if (missingIds.length) throw new Error("IDs usados no JavaScript e ausentes no HTML: " + missingIds.join(", "));
 
 const assetRefs = [
   ...[...html.matchAll(/(?:src|href)=["']([^"']+)["']/g)].map((match) => match[1]),
-  ...[...manifest.icons].map((icon) => icon.src)
+  ...manifest.icons.map((icon) => icon.src)
 ].filter((ref) => !/^(https?:|#|mailto:|data:)/i.test(ref));
-const missingAssets = [...new Set(assetRefs)].filter((ref) => !fs.existsSync(path.join(root, ref.replace(/^\\.\\//, ""))));
+const missingAssets = [...new Set(assetRefs)].filter((ref) => !fs.existsSync(path.join(root, ref.replace(/^\.\//, ""))));
 if (missingAssets.length) throw new Error("Arquivos locais referenciados e ausentes: " + missingAssets.join(", "));
 
 if (manifest.start_url !== "./" || manifest.scope !== "./") throw new Error("Manifesto PWA com escopo inesperado.");
