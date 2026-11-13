@@ -124,13 +124,13 @@
                 <label for="endTime">Horário final <span>*</span></label>
                 <input id="endTime" name="endTime" type="time" required>
               </div>
-              <div class="field">
+              <div class="field is-hidden" id="vehicleOrderField">
                 <label for="vehicleOrder">Nº de ordem do veículo <span>*</span></label>
-                <input id="vehicleOrder" name="vehicleOrder" type="text" placeholder="Ex.: T1-R32" maxlength="30" required>
+                <input id="vehicleOrder" name="vehicleOrder" type="text" placeholder="Ex.: T1-R32" maxlength="30" required disabled>
               </div>
-              <div class="field">
+              <div class="field is-hidden" id="plateField">
                 <label for="plate">Placa <span>*</span></label>
-                <input id="plate" name="plate" type="text" placeholder="ABC1D23" maxlength="10" autocomplete="off" required>
+                <input id="plate" name="plate" type="text" placeholder="ABC1D23" maxlength="10" autocomplete="off" required disabled>
               </div>
             </div>
           </div>
