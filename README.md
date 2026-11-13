@@ -26,8 +26,8 @@ Aplicativo pessoal, estático e instalável para registrar jornadas, intervalos,
 
 - Jornada bruta = data/hora final menos data/hora inicial.
 - Horas trabalhadas = jornada bruta menos o intervalo descontado.
-- Base contratual configurada = **7 horas e 20 minutos por colaborador em cada data inicial**.
-- Todos os lançamentos da mesma matrícula e data inicial compartilham a mesma cota diária de 7h20.
+- Jornada diária de referência = **7 horas e 20 minutos por matrícula**, podendo ser personalizada no aplicativo.
+- Todos os lançamentos da mesma matrícula e data inicial compartilham a cota diária configurada para aquela matrícula.
 - As horas trabalhadas são somadas por dia e as horas extras correspondem ao excedente diário.
 - Para exibir os valores por lançamento, o sistema distribui primeiro as horas normais em ordem cronológica até completar 7h20; o restante é classificado como extra.
 - Jornadas que atravessam a meia-noite são integralmente atribuídas à data inicial, conforme regra operacional definida.
@@ -35,11 +35,11 @@ Aplicativo pessoal, estático e instalável para registrar jornadas, intervalos,
 
 Intervalos e folgas aparecem nos relatórios e exportações, mas não entram nos totais de horas trabalhadas, normais ou extras.
 
-A competência mensal usa o mês da **Data inicial** do lançamento. A apuração diária agrupa por matrícula + data inicial. Se houver vários lançamentos no mesmo dia, a jornada normal de 7h20 é compartilhada entre eles, em ordem cronológica; o excedente diário é classificado como hora extra. Jornadas que atravessam a meia-noite são integralmente atribuídas à data inicial e não são divididas entre datas.
+A competência mensal usa o mês da **Data inicial** do lançamento. A apuração diária agrupa por matrícula + data inicial. Se houver vários lançamentos no mesmo dia, a jornada normal configurada para a matrícula é compartilhada entre eles, em ordem cronológica; o excedente diário é classificado como hora extra. Jornadas que atravessam a meia-noite são integralmente atribuídas à data inicial e não são divididas entre datas.
 
 ## Espelho mensal individual
 
-Na seção **Espelho mensal individual**, selecione a competência e a matrícula para gerar o relatório. O espelho consolida dias com lançamento, horas trabalhadas, horas normais e horas extras, além de detalhar as jornadas e os serviços de cada dia. A impressão do espelho é isolada do restante da página. Os totais utilizam a mesma apuração diária de 7h20 aplicada ao histórico e às exportações.
+Na seção **Espelho mensal individual**, selecione a competência e a matrícula para gerar o relatório. O espelho consolida dias com lançamento, horas trabalhadas, horas normais e horas extras, além de detalhar as jornadas e os serviços de cada dia. A impressão do espelho é isolada do restante da página. Os totais utilizam a mesma apuração diária configurada para a matrícula, aplicada ao histórico e às exportações.
 
 ## Verificação de conflitos
 
