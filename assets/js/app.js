@@ -103,7 +103,7 @@
       const registration = String(item.registration || "").trim();
       const startDate = String(item.startDate || "");
       const service = String(item.serviceType || "");
-      if (!registration || !/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) || !validTypes.includes(service)) { rejected += 1; return; }
+      if (!registration || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !validTypes.includes(service)) { rejected += 1; return; }
       let id = String(item.id || "");
       if (!id || usedIds.has(id)) id = "restaurado-" + Date.now() + "-" + Math.random().toString(16).slice(2);
       usedIds.add(id);
