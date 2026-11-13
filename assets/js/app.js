@@ -161,6 +161,11 @@
 
   function toggleRouteFields() {
     const isTrip = serviceType.value === "Viagem";
+    const vehicleOrderField = document.getElementById("vehicleOrderField");
+    const plateField = document.getElementById("plateField");
+    const vehicleOrderInput = document.getElementById("vehicleOrder");
+    const plateInput = document.getElementById("plate");
+
     routeFields.classList.toggle("is-hidden", !isTrip);
     routeFields.setAttribute("aria-hidden", String(!isTrip));
     originInput.disabled = !isTrip;
@@ -168,9 +173,18 @@
     originInput.required = isTrip;
     destinationInput.required = isTrip;
 
+    vehicleOrderField.classList.toggle("is-hidden", !isTrip);
+    plateField.classList.toggle("is-hidden", !isTrip);
+    vehicleOrderInput.disabled = !isTrip;
+    plateInput.disabled = !isTrip;
+    vehicleOrderInput.required = isTrip;
+    plateInput.required = isTrip;
+
     if (!isTrip) {
       originInput.value = "";
       destinationInput.value = "";
+      vehicleOrderInput.value = "";
+      plateInput.value = "";
     }
   }
 
@@ -219,8 +233,8 @@
       interval: String(data.get("interval") || "").trim(),
       endDate: String(data.get("endDate") || ""),
       endTime: String(data.get("endTime") || ""),
-      vehicleOrder: String(data.get("vehicleOrder") || "").trim(),
-      plate: String(data.get("plate") || "").trim().toUpperCase(),
+      vehicleOrder: serviceType.value === "Viagem" ? String(data.get("vehicleOrder") || "").trim() : "",
+      plate: serviceType.value === "Viagem" ? String(data.get("plate") || "").trim().toUpperCase() : "",
       serviceType: String(data.get("serviceType") || ""),
       origin: serviceType.value === "Viagem" ? String(data.get("origin") || "").trim() : "",
       destination: serviceType.value === "Viagem" ? String(data.get("destination") || "").trim() : "",
@@ -236,14 +250,16 @@
       ["Horário inicial", record.startTime],
       ["Data final", record.endDate],
       ["Horário final", record.endTime],
-      ["Nº de ordem do veículo", record.vehicleOrder],
-      ["Placa", record.plate],
       ["Tipo de serviço", record.serviceType]
     ];
     const missing = requiredFields.find(([, value]) => !value);
     if (missing) return "Preencha o campo obrigatório: " + missing[0] + ".";
     if (record.serviceType !== "Plantão" && record.serviceType !== "Viagem") return "Selecione Plantão ou Viagem.";
-    if (record.serviceType === "Viagem" && (!record.origin || !record.destination)) return "Informe a origem e o destino da viagem.";
+    if (record.serviceType === "Viagem") {
+      if (!record.vehicleOrder) return "Informe o nº de ordem do veículo para a viagem.";
+      if (!record.plate) return "Informe a placa do veículo para a viagem.";
+      if (!record.origin || !record.destination) return "Informe a origem e o destino da viagem.";
+    }
     const metrics = getWorkMetrics(record);
     if (metrics.error) return metrics.error;
     return "";
