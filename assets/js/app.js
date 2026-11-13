@@ -1158,7 +1158,7 @@
     if (!key) { scheduleFeedback.textContent = "Informe a matrícula para salvar uma jornada."; scheduleRegistrationInput.focus(); return; }
     let target = Number(schedulePreset.value);
     if (schedulePreset.value === "custom") {
-      const match = customScheduleTime.value.match(/^(\\d{2}):(\\d{2})$/);
+      const match = customScheduleTime.value.match(/^(\d{2}):(\d{2})$/);
       if (!match) { scheduleFeedback.textContent = "Informe a carga no formato HH:MM."; return; }
       target = Number(match[1])*60+Number(match[2]);
     }
