@@ -259,6 +259,33 @@
           <span>Base contratual: 7h20 por dia</span>
         </div>
       </section>
+
+      <section class="panel individual-panel" id="individualReportPanel">
+        <div class="panel-heading">
+          <div class="panel-title-wrap">
+            <span class="section-index">03</span>
+            <div>
+              <h2>Espelho mensal individual</h2>
+              <p>Gere um relatório por colaborador e competência, pronto para impressão.</p>
+            </div>
+          </div>
+        </div>
+        <div class="individual-controls">
+          <div class="field">
+            <label for="individualMonth">Competência <span>*</span></label>
+            <select id="individualMonth" required><option value="">Selecione o mês</option></select>
+          </div>
+          <div class="field">
+            <label for="individualEmployee">Colaborador / matrícula <span>*</span></label>
+            <select id="individualEmployee" required disabled><option value="">Selecione a competência primeiro</option></select>
+          </div>
+          <div class="individual-actions">
+            <button id="generateIndividualReport" class="button button-primary" type="button">Gerar espelho</button>
+          </div>
+        </div>
+        <p class="individual-hint">O relatório considera somente os lançamentos salvos neste navegador e utiliza a apuração diária vigente de 7h20 por matrícula.</p>
+        <div id="individualReportOutput" class="individual-report-output is-hidden" aria-live="polite"></div>
+      </section>
     </main>
 
     <footer class="site-footer">

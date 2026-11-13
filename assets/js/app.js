@@ -849,6 +849,197 @@
     showFeedback("Planilha Excel gerada com quatro abas, filtros mensais e apuração diária de horas extras.", "success");
   }
 
+
+  const individualMonth = document.getElementById("individualMonth");
+  const individualEmployee = document.getElementById("individualEmployee");
+  const generateIndividualReportButton = document.getElementById("generateIndividualReport");
+  const individualReportOutput = document.getElementById("individualReportOutput");
+
+  function updateIndividualMonthOptions() {
+    const previous = individualMonth.value;
+    const months = [...new Set(records.map((record) => monthKey(record.startDate)).filter(Boolean))].sort().reverse();
+    individualMonth.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = months.length ? "Selecione o mês" : "Nenhum mês disponível";
+    individualMonth.append(placeholder);
+    months.forEach((month) => {
+      const option = document.createElement("option");
+      option.value = month;
+      option.textContent = formatMonth(month);
+      individualMonth.append(option);
+    });
+    individualMonth.value = months.includes(previous) ? previous : (months[0] || "");
+    updateIndividualEmployeeOptions();
+  }
+
+  function updateIndividualEmployeeOptions() {
+    const previous = individualEmployee.value;
+    const month = individualMonth.value;
+    const monthRecords = records.filter((record) => monthKey(record.startDate) === month);
+    const employees = new Map();
+    monthRecords.forEach((record) => {
+      const registration = normalizeRegistration(record.registration);
+      if (!registration) return;
+      const current = employees.get(registration);
+      if (!current || (!current.fullName && record.fullName)) {
+        employees.set(registration, { registration, fullName: record.fullName || "" });
+      }
+    });
+    individualEmployee.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = employees.size ? "Selecione o colaborador" : "Nenhum colaborador neste mês";
+    individualEmployee.append(placeholder);
+    [...employees.values()].sort((a, b) => (a.fullName || a.registration).localeCompare(b.fullName || b.registration, "pt-BR"))
+      .forEach((employee) => {
+        const option = document.createElement("option");
+        option.value = employee.registration;
+        option.textContent = (employee.fullName || "Colaborador") + " · Matrícula " + employee.registration;
+        individualEmployee.append(option);
+      });
+    individualEmployee.disabled = employees.size === 0;
+    individualEmployee.value = employees.has(previous) ? previous : "";
+  }
+
+  function appendReportCell(row, value, className, tagName = "td") {
+    const cell = document.createElement(tagName);
+    if (className) cell.className = className;
+    cell.textContent = value;
+    row.append(cell);
+    return cell;
+  }
+
+  function generateIndividualReport() {
+    const month = individualMonth.value;
+    const registration = individualEmployee.value;
+    if (!month || !registration) {
+      showFeedback("Selecione a competência e o colaborador para gerar o espelho.", "error");
+      return;
+    }
+    const employeeRecords = records.filter((record) =>
+      monthKey(record.startDate) === month && normalizeRegistration(record.registration) === registration
+    ).sort((a, b) => ((a.startDate || "") + " " + (a.startTime || "")).localeCompare((b.startDate || "") + " " + (b.startTime || "")));
+    if (!employeeRecords.length) {
+      showFeedback("Não há lançamentos para este colaborador na competência selecionada.", "error");
+      return;
+    }
+
+    const dailyMetrics = calculateDailyMetrics(records);
+    const days = new Map();
+    let workedTotal = 0;
+    let regularTotal = 0;
+    let overtimeTotal = 0;
+    let invalidCount = 0;
+    employeeRecords.forEach((record) => {
+      const metrics = dailyMetrics.get(record) || getWorkMetrics(record);
+      if (metrics.error) { invalidCount += 1; return; }
+      workedTotal += metrics.workedMinutes;
+      regularTotal += metrics.regularMinutes;
+      overtimeTotal += metrics.overtimeMinutes;
+      if (!days.has(record.startDate)) days.set(record.startDate, { worked: 0, regular: 0, overtime: 0, shifts: [] });
+      const day = days.get(record.startDate);
+      day.worked += metrics.workedMinutes;
+      day.regular += metrics.regularMinutes;
+      day.overtime += metrics.overtimeMinutes;
+      const service = record.serviceType === "Viagem"
+        ? "Viagem" + (record.origin || record.destination ? " (" + (record.origin || "—") + " → " + (record.destination || "—") + ")" : "")
+        : (record.serviceType || "Serviço");
+      day.shifts.push((record.startTime || "—") + "–" + (record.endTime || "—") +
+        (record.endDate && record.endDate !== record.startDate ? " (" + formatDate(record.endDate) + ")" : "") +
+        " · " + service + " · Intervalo: " + (record.interval || "não informado"));
+    });
+
+    const first = employeeRecords.find((record) => record.fullName);
+    individualReportOutput.replaceChildren();
+    const heading = document.createElement("div");
+    heading.className = "individual-report-heading";
+    const title = document.createElement("h3");
+    title.textContent = "Espelho mensal de ponto";
+    const subtitle = document.createElement("p");
+    subtitle.textContent = formatMonth(month) + " · " + (first ? first.fullName : "Colaborador") + " · Matrícula " + registration;
+    heading.append(title, subtitle);
+    const printReportButton = document.createElement("button");
+    printReportButton.type = "button";
+    printReportButton.className = "button button-outline individual-print-button";
+    printReportButton.textContent = "Imprimir espelho";
+    printReportButton.addEventListener("click", printIndividualReport);
+    heading.append(printReportButton);
+    const generated = document.createElement("small");
+    generated.className = "individual-generated";
+    generated.textContent = "Gerado em " + new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date());
+    heading.append(generated);
+    individualReportOutput.append(heading);
+
+    const summary = document.createElement("div");
+    summary.className = "individual-summary";
+    [
+      ["Dias com lançamento", String(days.size)],
+      ["Horas trabalhadas", formatMinutes(workedTotal)],
+      ["Horas normais", formatMinutes(regularTotal)],
+      ["Horas extras", formatMinutes(overtimeTotal)]
+    ].forEach(([label, value]) => {
+      const card = document.createElement("div");
+      card.className = "individual-summary-card";
+      const strong = document.createElement("strong");
+      strong.textContent = value;
+      const small = document.createElement("small");
+      small.textContent = label;
+      card.append(strong, small);
+      summary.append(card);
+    });
+    individualReportOutput.append(summary);
+
+    const tableWrap = document.createElement("div");
+    tableWrap.className = "individual-table-wrap";
+    const table = document.createElement("table");
+    table.className = "individual-table";
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    ["Data", "Jornadas / serviços do dia", "Trabalhadas", "Normais", "Extras"].forEach((label) => appendReportCell(headerRow, label, "", "th"));
+    thead.append(headerRow);
+    table.append(thead);
+    const tbody = document.createElement("tbody");
+    [...days.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([date, day]) => {
+      const row = document.createElement("tr");
+      appendReportCell(row, formatDate(date));
+      const shiftsCell = appendReportCell(row, day.shifts.join("\n"), "individual-shifts");
+      shiftsCell.style.whiteSpace = "pre-line";
+      appendReportCell(row, formatMinutes(day.worked), "numeric-cell");
+      appendReportCell(row, formatMinutes(day.regular), "numeric-cell");
+      appendReportCell(row, formatMinutes(day.overtime), "numeric-cell " + (day.overtime > 0 ? "has-overtime" : ""));
+      tbody.append(row);
+    });
+    table.append(tbody);
+    tableWrap.append(table);
+    individualReportOutput.append(tableWrap);
+
+    const note = document.createElement("p");
+    note.className = "individual-report-note";
+    note.textContent = "Critério: base diária de 7h20 por matrícula. As horas normais são alocadas cronologicamente entre os lançamentos do dia; o excedente é classificado como hora extra. Jornadas que atravessam a meia-noite permanecem vinculadas à data inicial.";
+    individualReportOutput.append(note);
+    if (invalidCount) {
+      const warning = document.createElement("p");
+      warning.className = "individual-report-warning";
+      warning.textContent = invalidCount + " lançamento(s) com dados inválidos foram desconsiderados dos totais.";
+      individualReportOutput.append(warning);
+    }
+    individualReportOutput.classList.remove("is-hidden");
+    individualReportOutput.scrollIntoView({ behavior: "smooth", block: "start" });
+    clearFeedback();
+  }
+
+  function printIndividualReport() {
+    if (individualReportOutput.classList.contains("is-hidden")) {
+      showFeedback("Gere o espelho mensal antes de imprimir.", "error");
+      return;
+    }
+    document.body.classList.add("printing-individual-report");
+    window.print();
+  }
+
+  window.addEventListener("afterprint", () => document.body.classList.remove("printing-individual-report"));
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     clearFeedback();
@@ -916,6 +1107,8 @@
   });
 
   monthFilter.addEventListener("change", renderRecords);
+  individualMonth.addEventListener("change", () => { updateIndividualEmployeeOptions(); individualReportOutput.classList.add("is-hidden"); });
+  generateIndividualReportButton.addEventListener("click", generateIndividualReport);
   clearFilterButton.addEventListener("click", () => {
     monthFilter.value = "";
     renderRecords();
@@ -930,4 +1123,5 @@
   toggleRouteFields();
   updateDurationPreview();
   renderRecords();
+  updateIndividualMonthOptions();
 })();

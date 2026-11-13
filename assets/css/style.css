@@ -238,3 +238,60 @@ tbody tr:last-child td { border-bottom: 0; }
   table { font-size: 8px; }
   th, td { padding: 6px 5px; }
 }
+
+
+.individual-panel { margin-top: 18px; padding: 22px 24px; }
+.individual-controls { display: grid; grid-template-columns: minmax(170px, .8fr) minmax(250px, 1.4fr) auto; align-items: end; gap: 14px; }
+.individual-controls .field { min-width: 0; }
+.individual-controls select { width: 100%; height: 39px; padding: 0 10px; border: 1px solid #dfe5ed; border-radius: 7px; background: #fff; color: #31445b; font: inherit; font-size: 11px; }
+.individual-controls select:focus { outline: 3px solid rgba(35,107,203,.12); border-color: #75a5e2; }
+.individual-actions { padding-bottom: 1px; }
+.individual-hint, .individual-report-note { color: #8995a4; font-size: 9px; line-height: 1.6; }
+.individual-report-output { margin-top: 20px; padding-top: 18px; border-top: 1px solid #e8edf2; }
+.individual-report-heading { position: relative; padding-right: 140px; }
+.individual-report-heading h3 { margin: 0 0 5px; color: #26374c; font-size: 16px; }
+.individual-report-heading p { margin: 0; color: #5d6d80; font-size: 11px; }
+.individual-generated { display: block; margin-top: 6px; color: #9aa5b2; font-size: 9px; }
+.individual-print-button { position: absolute; top: 0; right: 0; }
+.individual-summary { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 9px; margin: 16px 0; }
+.individual-summary-card { padding: 12px; border: 1px solid #e8edf2; border-radius: 8px; background: #fafbfd; }
+.individual-summary-card strong { display: block; color: #26374c; font-size: 16px; font-variant-numeric: tabular-nums; }
+.individual-summary-card small { display: block; margin-top: 4px; color: #8592a2; font-size: 9px; }
+.individual-table-wrap { overflow-x: auto; border: 1px solid #e8edf2; border-radius: 8px; }
+.individual-table { min-width: 680px; }
+.individual-table th, .individual-table td { padding: 10px; }
+.individual-table .individual-shifts { min-width: 300px; line-height: 1.7; }
+.numeric-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.individual-table .has-overtime { color: #b66b11; font-weight: 800; }
+.individual-report-warning { color: #a52d3b; font-size: 10px; }
+@media (max-width: 800px) {
+  .individual-panel { padding: 19px 17px; }
+  .individual-controls { grid-template-columns: 1fr 1fr; }
+  .individual-actions { grid-column: span 2; }
+}
+@media (max-width: 540px) {
+  .individual-panel { padding: 17px 12px; }
+  .individual-controls { grid-template-columns: 1fr; }
+  .individual-actions { grid-column: auto; }
+  .individual-actions .button { width: 100%; }
+  .individual-summary { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .individual-report-heading { padding-right: 0; }
+  .individual-print-button { position: static; margin-top: 12px; }
+}
+@media print {
+  body.printing-individual-report .app-shell > *:not(main),
+  body.printing-individual-report main > *:not(#individualReportPanel) { display: none !important; }
+  body.printing-individual-report #individualReportPanel { display: block !important; margin: 0; padding: 0; border: 0; box-shadow: none; }
+  body.printing-individual-report #individualReportPanel > .panel-heading,
+  body.printing-individual-report .individual-controls,
+  body.printing-individual-report .individual-hint,
+  body.printing-individual-report .individual-print-button { display: none !important; }
+  body.printing-individual-report .individual-report-output { display: block !important; margin: 0; padding: 0; border: 0; }
+  body.printing-individual-report .individual-report-heading { padding: 0 0 12px; }
+  body.printing-individual-report .individual-report-heading h3 { font-size: 17px; }
+  body.printing-individual-report .individual-summary-card { background: #fff; }
+  body.printing-individual-report .individual-table-wrap { overflow: visible; border: 0; }
+  body.printing-individual-report .individual-table { min-width: 0; font-size: 8px; }
+  body.printing-individual-report .individual-table th,
+  body.printing-individual-report .individual-table td { padding: 6px 5px; font-size: 8px; }
+}
