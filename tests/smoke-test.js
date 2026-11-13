@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const html = read("index.html");
 const js = read("assets/js/app.js");
+const engine = read("assets/js/time-engine.js");
 const manifest = JSON.parse(read("manifest.webmanifest"));
 const sw = read("sw.js");
 
@@ -23,6 +24,8 @@ const assetRefs = [
 const missingAssets = [...new Set(assetRefs)].filter((ref) => !fs.existsSync(path.join(root, ref.replace(/^\.\//, ""))));
 if (missingAssets.length) throw new Error("Arquivos locais referenciados e ausentes: " + missingAssets.join(", "));
 
+if (!html.includes('assets/js/time-engine.js" defer></script>\\n  <script src="assets/js/app.js"')) throw new Error("O motor de cálculo deve carregar antes do aplicativo.");
+if (!engine.includes("calculateDailyMetrics") || !engine.includes("parseIntervalMinutes")) throw new Error("Motor de cálculo incompleto.");
 if (manifest.start_url !== "./" || manifest.scope !== "./") throw new Error("Manifesto PWA com escopo inesperado.");
 if (!sw.includes("addAll(APP_SHELL)") || !sw.includes("caches.match(request)")) throw new Error("Service Worker sem cache essencial/offline.");
 for (const required of ["exportBackup", "importBackup", "calculateDailyMetrics", "generateIndividualReport"]) {
