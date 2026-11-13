@@ -66,7 +66,13 @@ async function run() {
     await page.locator("#schedulePreset").selectOption("custom");
     await page.locator("#customScheduleTime").fill("08:00");
     await page.locator("#saveScheduleButton").click();
-    check((await page.locator("#scheduleFeedback").textContent()).includes("8h00"), "Jornada personalizada salva");
+    const scheduleResult = await page.evaluate(() => ({
+      feedback: document.querySelector("#scheduleFeedback").textContent,
+      customValue: document.querySelector("#customScheduleTime").value,
+      preset: document.querySelector("#schedulePreset").value,
+      saved: JSON.parse(localStorage.getItem("controleDePonto.jornadas.v1") || "{}")
+    }));
+    check(scheduleResult.saved["TESTE-001"] === 480, "Jornada personalizada salva: " + JSON.stringify(scheduleResult));
 
     // Required-field validation must stop an incomplete record.
     await page.locator("#serviceType").selectOption("Plantão");
