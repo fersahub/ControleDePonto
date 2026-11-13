@@ -29,7 +29,9 @@ jobs:
       - name: Baixar código
         uses: actions/checkout@v4
       - name: Validar JavaScript
-        run: node --check assets/js/app.js
+        run: |
+          node --check assets/js/time-engine.js
+          node --check assets/js/app.js
       - name: Teste estrutural do site
         run: node tests/smoke-test.js
       - name: Testes de cálculos e jornadas
