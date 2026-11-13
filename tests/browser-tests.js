@@ -115,6 +115,7 @@ async function run() {
     await fillIdentity();
     await page.locator("#serviceType").selectOption("Plantão");
     await fillDates("2026-11-12", "18:00", "19:00");
+    await page.locator("#interval").fill("");
     await submit();
     records = await page.evaluate(() => JSON.parse(localStorage.getItem("controleDePonto.registros.v1") || "[]"));
     check(records.length === 2, "Segundo lançamento sequencial permitido");
