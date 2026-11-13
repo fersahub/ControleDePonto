@@ -416,6 +416,7 @@
 
   function renderRecords() {
     updateMonthFilterOptions();
+    updateIndividualMonthOptions();
     const visibleRecords = getVisibleRecords();
     const dailyMetrics = calculateDailyMetrics(records);
     recordsBody.replaceChildren();
@@ -1108,6 +1109,7 @@
 
   monthFilter.addEventListener("change", renderRecords);
   individualMonth.addEventListener("change", () => { updateIndividualEmployeeOptions(); individualReportOutput.classList.add("is-hidden"); });
+  individualEmployee.addEventListener("change", () => individualReportOutput.classList.add("is-hidden"));
   generateIndividualReportButton.addEventListener("click", generateIndividualReport);
   clearFilterButton.addEventListener("click", () => {
     monthFilter.value = "";
