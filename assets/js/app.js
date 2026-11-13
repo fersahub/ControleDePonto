@@ -1267,7 +1267,7 @@
   updateDurationPreview();
   renderRecords();
   updateIndividualMonthOptions();
-  if ("serviceWorker" in navigator && window.location.protocol === "https:") {
+  if ("serviceWorker" in navigator && (window.location.protocol === "https:" || ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname))) {
     navigator.serviceWorker.register("./sw.js").catch((error) => console.warn("Não foi possível ativar o modo offline.", error));
   }
 })();
