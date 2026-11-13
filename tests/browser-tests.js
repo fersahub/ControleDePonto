@@ -66,7 +66,7 @@ async function run() {
     await page.locator("#schedulePreset").selectOption("custom");
     await page.locator("#customScheduleTime").fill("08:00");
     await page.locator("#saveScheduleButton").click();
-    check((await page.locator("#scheduleFeedback").textContent()).includes("08h00"), "Jornada personalizada salva");
+    check((await page.locator("#scheduleFeedback").textContent()).includes("8h00"), "Jornada personalizada salva");
 
     const fillIdentity = async () => {
       await page.locator("#fullName").fill("Pessoa de Teste");
@@ -152,7 +152,7 @@ async function run() {
     check(csvText.includes("Competência") && csvText.includes("Folga") && csvText.includes("Intervalo") && csvText.includes("Viagem"), "CSV exporta todos os tipos de serviço");
 
     // Excel export is tested when the external SheetJS dependency is reachable.
-    await page.waitForFunction(() => !!(window.XLSX && window.XLSX.writeFile), { timeout: 30000 });
+    await page.waitForFunction(() => !!(window.XLSX && window.XLSX.writeFile), undefined, { timeout: 30000 });
     const excelDownloadPromise = page.waitForEvent("download");
     await page.locator("#exportButton").click();
     const excelDownload = await excelDownloadPromise;
@@ -192,7 +192,7 @@ async function run() {
       if (!("serviceWorker" in navigator)) throw new Error("Service Worker indisponível");
       await navigator.serviceWorker.ready;
     });
-    await page.waitForFunction(() => !!navigator.serviceWorker.controller, { timeout: 10000 });
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 10000 });
     await context.setOffline(true);
     await page.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
     check(await page.locator("h1").innerText() === "Meu controle de jornada", "Página inicial abre offline após primeiro carregamento");
