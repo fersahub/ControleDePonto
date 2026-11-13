@@ -90,17 +90,19 @@ async function run() {
     check((await page.locator("#formFeedback").textContent()).includes("Nome completo"), "Formulário rejeita identificação incompleta");
     await fillIdentity();
 
-    const fillIdentity = async () => {
+    async function fillIdentity() {
       await page.locator("#fullName").fill("Pessoa de Teste");
       await page.locator("#registration").fill("TESTE-001");
-    };
-    const fillDates = async (date, start, end) => {
+    }
+    async function fillDates(date, start, end) {
       await page.locator("#startDate").fill(date);
       await page.locator("#startTime").fill(start);
       await page.locator("#endDate").fill(date);
       await page.locator("#endTime").fill(end);
-    };
-    const submit = async () => page.locator('#timeForm button[type="submit"]').click();
+    }
+    async function submit() {
+      await page.locator('#timeForm button[type="submit"]').click();
+    }
 
     await fillIdentity();
     await page.locator("#serviceType").selectOption("Plantão");
