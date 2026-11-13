@@ -68,6 +68,17 @@ async function run() {
     await page.locator("#saveScheduleButton").click();
     check((await page.locator("#scheduleFeedback").textContent()).includes("8h00"), "Jornada personalizada salva");
 
+    // Required-field validation must stop an incomplete record.
+    await page.locator("#serviceType").selectOption("Plantão");
+    await page.locator("#startDate").fill("2026-11-12");
+    await page.locator("#startTime").fill("08:00");
+    await page.locator("#endDate").fill("2026-11-12");
+    await page.locator("#endTime").fill("17:00");
+    await page.locator("#interval").fill("01:00");
+    await submit();
+    check((await page.locator("#formFeedback").textContent()).includes("Nome completo"), "Formulário rejeita identificação incompleta");
+    await fillIdentity();
+
     const fillIdentity = async () => {
       await page.locator("#fullName").fill("Pessoa de Teste");
       await page.locator("#registration").fill("TESTE-001");
@@ -88,6 +99,17 @@ async function run() {
     let records = await page.evaluate(() => JSON.parse(localStorage.getItem("controleDePonto.registros.v1") || "[]"));
     check(records.length === 1, "Plantão salvo");
     check(records[0].interval === "01:00", "Intervalo descontado armazenado");
+
+    // Duplicate periods require explicit confirmation; cancelling must preserve the unsaved form.
+    await fillIdentity();
+    await page.locator("#serviceType").selectOption("Plantão");
+    await fillDates("2026-11-12", "08:00", "17:00");
+    await page.locator("#interval").fill("01:00");
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await submit();
+    records = await page.evaluate(() => JSON.parse(localStorage.getItem("controleDePonto.registros.v1") || "[]"));
+    check(records.length === 1, "Duplicidade cancelada não grava registro");
+    check((await page.locator("#formFeedback").textContent()).includes("cancelada"), "Cancelamento de duplicidade informado");
 
     // The 8h target is shared by all shifts in the same day. The second shift is fully overtime.
     await fillIdentity();
@@ -142,6 +164,8 @@ async function run() {
     check(reportText.includes("Espelho mensal de ponto"), "Espelho mensal gerado");
     check(reportText.includes("FOLGA") && reportText.includes("INTERVALO"), "Espelho detalha folga e intervalo");
     check(reportText.includes("Pessoa de Teste"), "Espelho identifica a pessoa");
+    check(reportText.includes("17h 00min") && reportText.includes("1h 00min"), "Espelho consolida horas trabalhadas e extras");
+    check(reportText.includes("4"), "Espelho inclui quatro dias com registros");
     
     // CSV export should contain all service types and headings.
     const csvDownloadPromise = page.waitForEvent("download");
@@ -157,7 +181,18 @@ async function run() {
     await page.locator("#exportButton").click();
     const excelDownload = await excelDownloadPromise;
     check((await excelDownload.suggestedFilename()).endsWith(".xlsx"), "Exportação Excel gera arquivo XLSX");
-    check((await excelDownload.path()) !== null, "Arquivo Excel foi produzido");
+    const excelPath = await excelDownload.path();
+    check(excelPath !== null, "Arquivo Excel foi produzido");
+    const excelBase64 = fs.readFileSync(excelPath).toString("base64");
+    const excelCheck = await page.evaluate((payload) => {
+      const workbook = window.XLSX.read(payload, { type: "base64" });
+      return {
+        sheetNames: workbook.SheetNames,
+        launchRows: window.XLSX.utils.sheet_to_json(workbook.Sheets["Lançamentos"]).length
+      };
+    }, excelBase64);
+    check(excelCheck.sheetNames.includes("Resumo mensal") && excelCheck.sheetNames.includes("Resumo por colaborador") && excelCheck.sheetNames.includes("Instruções"), "Excel contém as quatro abas esperadas");
+    check(excelCheck.launchRows === 5, "Excel contém todos os lançamentos");
 
     // Backup round-trip includes records and personalized schedules.
     const backupDownloadPromise = page.waitForEvent("download");
