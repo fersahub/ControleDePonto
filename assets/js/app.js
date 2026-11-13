@@ -704,7 +704,10 @@
     const instructions = [
       ["CONTROLE DE PONTO · INSTRUÇÕES"],
       ["Como usar", "Na aba Lançamentos, use o filtro da coluna Competência para selecionar o mês desejado."],
-      ["Resumo", "A aba Resumo mensal consolida quantidade de lançamentos, horas trabalhadas, horas extras, plantões e viagens por mês."],
+      ["Resumo mensal", "A aba Resumo mensal consolida quantidade de lançamentos, horas trabalhadas, horas extras, plantões e viagens por mês."],
+      ["Resumo individual", "A aba Resumo por colaborador apresenta uma linha por matrícula e competência, com lançamentos, plantões, viagens, jornada bruta, horas trabalhadas e horas extras."],
+      ["Filtro individual", "Use os filtros da tabela na aba Resumo por colaborador para selecionar Competência, Colaborador ou Matrícula."],
+      ["Impressão individual", "Depois de aplicar os filtros de competência e matrícula/colaborador, use Arquivo > Imprimir. Para melhor leitura, escolha papel A4, orientação Paisagem e ajuste todas as colunas em uma página de largura."],
       ["Jornada bruta", "Diferença entre a data/hora final e a data/hora inicial."],
       ["Intervalo", "O intervalo informado é descontado da jornada bruta. Formatos aceitos no site: 01:00, 1h, 60 min ou 12:00 às 13:00. Campo vazio equivale a zero."],
       ["Horas trabalhadas", "Jornada bruta menos intervalo descontado."],
