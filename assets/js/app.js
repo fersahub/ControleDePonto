@@ -565,6 +565,142 @@
     }
     XLSX.utils.book_append_sheet(workbook, summarySheet, "Resumo mensal");
 
+    // Uma linha por competência + matrícula, para filtrar e imprimir o resumo individual.
+    const employeeGroups = new Map();
+    sortedRecords.forEach((record) => {
+      const metrics = getWorkMetrics(record);
+      if (metrics.error) return;
+      const month = monthKey(record.startDate);
+      const registration = String(record.registration || "").trim();
+      if (!month || !registration) return;
+
+      const key = month + "|" + registration;
+      if (!employeeGroups.has(key)) {
+        employeeGroups.set(key, {
+          month,
+          registration,
+          names: new Map(),
+          launches: 0,
+          plantons: 0,
+          trips: 0,
+          grossMinutes: 0,
+          workedMinutes: 0,
+          overtimeMinutes: 0
+        });
+      }
+      const group = employeeGroups.get(key);
+      const employeeName = String(record.fullName || "").trim() || "Nome não informado";
+      group.names.set(employeeName, (group.names.get(employeeName) || 0) + 1);
+      group.launches += 1;
+      if (record.serviceType === "Plantão") group.plantons += 1;
+      if (record.serviceType === "Viagem") group.trips += 1;
+      group.grossMinutes += metrics.elapsedMinutes;
+      group.workedMinutes += metrics.workedMinutes;
+      group.overtimeMinutes += metrics.overtimeMinutes;
+    });
+
+    const employeeSummaries = [...employeeGroups.values()].map((group) => {
+      const mostFrequentName = [...group.names.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR"))[0];
+      return { ...group, fullName: mostFrequentName ? mostFrequentName[0] : "Nome não informado" };
+    }).sort((a, b) =>
+      a.month.localeCompare(b.month) ||
+      a.fullName.localeCompare(b.fullName, "pt-BR") ||
+      a.registration.localeCompare(b.registration, "pt-BR")
+    );
+
+    const employeeHeaders = [
+      "Competência", "Colaborador", "Matrícula", "Lançamentos",
+      "Plantões", "Viagens", "Jornada bruta", "Horas trabalhadas", "Horas extras"
+    ];
+    const employeeRows = employeeSummaries.map((group) => [
+      group.month,
+      group.fullName,
+      group.registration,
+      group.launches,
+      group.plantons,
+      group.trips,
+      excelDuration(group.grossMinutes),
+      excelDuration(group.workedMinutes),
+      excelDuration(group.overtimeMinutes)
+    ]);
+    const employeeSheet = XLSX.utils.aoa_to_sheet([
+      ["RESUMO INDIVIDUAL POR COLABORADOR"],
+      ["Uma linha por matrícula e competência. Use os filtros da tabela para selecionar o mês e o colaborador; depois, imprima somente as linhas filtradas."],
+      [],
+      employeeHeaders,
+      ...employeeRows
+    ]);
+
+    const employeeLastRow = employeeRows.length + 4;
+    const employeeRawLastRow = rows.length + 1;
+    const employeeMonthRange = "'Lançamentos'!$A$2:$A$" + employeeRawLastRow;
+    const employeeRegistrationRange = "'Lançamentos'!$C$2:$C$" + employeeRawLastRow;
+    const employeeServiceRange = "'Lançamentos'!$L$2:$L$" + employeeRawLastRow;
+    const employeeGrossRange = "'Lançamentos'!$O$2:$O$" + employeeRawLastRow;
+    const employeeWorkedRange = "'Lançamentos'!$P$2:$P$" + employeeRawLastRow;
+    const employeeOvertimeRange = "'Lançamentos'!$S$2:$S$" + employeeRawLastRow;
+
+    employeeSummaries.forEach((group, index) => {
+      const excelRow = index + 5;
+      employeeSheet["D" + excelRow] = {
+        t: "n",
+        f: "COUNTIFS(" + employeeMonthRange + ",A" + excelRow + "," + employeeRegistrationRange + ",C" + excelRow + ")",
+        v: group.launches,
+        z: "0"
+      };
+      employeeSheet["E" + excelRow] = {
+        t: "n",
+        f: "COUNTIFS(" + employeeMonthRange + ",A" + excelRow + "," + employeeRegistrationRange + ",C" + excelRow + "," + employeeServiceRange + ",\"Plantão\")",
+        v: group.plantons,
+        z: "0"
+      };
+      employeeSheet["F" + excelRow] = {
+        t: "n",
+        f: "COUNTIFS(" + employeeMonthRange + ",A" + excelRow + "," + employeeRegistrationRange + ",C" + excelRow + "," + employeeServiceRange + ",\"Viagem\")",
+        v: group.trips,
+        z: "0"
+      };
+      employeeSheet["G" + excelRow] = {
+        t: "n",
+        f: "SUMIFS(" + employeeGrossRange + "," + employeeMonthRange + ",A" + excelRow + "," + employeeRegistrationRange + ",C" + excelRow + ")",
+        v: excelDuration(group.grossMinutes),
+        z: "[h]:mm"
+      };
+      employeeSheet["H" + excelRow] = {
+        t: "n",
+        f: "SUMIFS(" + employeeWorkedRange + "," + employeeMonthRange + ",A" + excelRow + "," + employeeRegistrationRange + ",C" + excelRow + ")",
+        v: excelDuration(group.workedMinutes),
+        z: "[h]:mm"
+      };
+      employeeSheet["I" + excelRow] = {
+        t: "n",
+        f: "SUMIFS(" + employeeOvertimeRange + "," + employeeMonthRange + ",A" + excelRow + "," + employeeRegistrationRange + ",C" + excelRow + ")",
+        v: excelDuration(group.overtimeMinutes),
+        z: "[h]:mm"
+      };
+    });
+
+    employeeSheet["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }
+    ];
+    employeeSheet["!rows"] = [
+      { hpt: 28 },
+      { hpt: 34 },
+      { hpt: 8 },
+      { hpt: 24 }
+    ];
+    employeeSheet["!autofilter"] = { ref: "A4:I" + Math.max(4, employeeLastRow) };
+    employeeSheet["!cols"] = [
+      { wch: 14 }, { wch: 30 }, { wch: 16 }, { wch: 14 },
+      { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 21 }, { wch: 16 }
+    ];
+    employeeSheet["!margins"] = {
+      left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2
+    };
+    XLSX.utils.book_append_sheet(workbook, employeeSheet, "Resumo por colaborador");
+
     const instructions = [
       ["CONTROLE DE PONTO · INSTRUÇÕES"],
       ["Como usar", "Na aba Lançamentos, use o filtro da coluna Competência para selecionar o mês desejado."],
