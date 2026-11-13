@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101b2b">
-  <meta name="description" content="Formulário de controle de ponto para operações de transporte.">
-  <title>Controle de Ponto | Operações</title>
+  <meta name="description" content="Aplicativo pessoal para registrar jornadas, intervalos, folgas e horas extras.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/icons/icon.svg" type="image/svg+xml">
+  <title>Meu Controle de Jornada</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script src="assets/js/app.js" defer></script>
@@ -22,21 +26,21 @@
         </span>
         <span class="brand-copy">
           <strong>CONTROLE<span> DE PONTO</span></strong>
-          <small>Gestão operacional de transporte</small>
+          <small>Controle pessoal de jornada</small>
         </span>
       </a>
       <div class="topbar-meta">
         <span class="status-dot"></span>
-        <span>Ambiente de lançamento</span>
+        <span>Modo pessoal</span>
       </div>
     </header>
 
     <main>
       <section class="page-heading">
         <div>
-          <p class="eyebrow">OPERAÇÕES <span>/</span> REGISTROS</p>
-          <h1>Controle de ponto</h1>
-          <p class="page-description">Cadastre e acompanhe os apontamentos de jornada dos colaboradores.</p>
+          <p class="eyebrow">MEU TEMPO <span>/</span> JORNADA</p>
+          <h1>Meu controle de jornada</h1>
+          <p class="page-description">Registre seus horários, acompanhe horas trabalhadas e mantenha seu histórico pessoal organizado.</p>
         </div>
         <div class="today-chip">
           <span class="today-icon" aria-hidden="true">◷</span>
@@ -53,7 +57,7 @@
         <article class="stat-card">
           <span class="stat-label">Horas extras no período</span>
           <div class="stat-value stat-value-hours" id="totalOvertime">0h</div>
-          <span class="stat-note">Acima da base diária de 7h20 por matrícula</span>
+          <span class="stat-note">Acima da jornada diária configurada</span>
         </article>
         <article class="stat-card">
           <span class="stat-label">Lançamentos de hoje</span>
@@ -61,9 +65,9 @@
           <span class="stat-note">Considerando a data inicial</span>
         </article>
         <article class="stat-card">
-          <span class="stat-label">Veículos no período</span>
+          <span class="stat-label">Dias com registros</span>
           <div class="stat-value" id="vehicleCount">0</div>
-          <span class="stat-note">Placas distintas no filtro</span>
+          <span class="stat-note">Datas com lançamentos no filtro</span>
         </article>
       </section>
 
@@ -76,7 +80,19 @@
           <div class="schedule-actions"><button id="saveScheduleButton" class="button button-primary" type="button">Salvar jornada</button><button id="resetScheduleButton" class="button button-quiet" type="button">Usar padrão</button></div>
         </div>
         <p class="schedule-feedback" id="scheduleFeedback" role="status" aria-live="polite">A jornada padrão é de 7h20 por dia. Cadastre uma matrícula para personalizar.</p>
-        <div class="schedule-note">A carga configurada é aplicada aos lançamentos daquela matrícula e à apuração diária de horas extras. Em escalas como 12x36, configure 12h como referência por dia trabalhado; o sistema não monta automaticamente o calendário de plantões.</div>
+        <div class="schedule-note">A carga configurada é aplicada aos lançamentos da sua matrícula. Nesta versão, você define a carga diária; escalas cíclicas como 12x36 ainda não montam automaticamente o calendário de trabalho e descanso.</div>
+      </section>
+
+      <section class="panel backup-panel" aria-labelledby="backupTitle">
+        <div class="panel-heading">
+          <div class="panel-title-wrap"><span class="section-index">00A</span><div><h2 id="backupTitle">Backup e restauração</h2><p>Proteja seus registros e transfira seus dados para outro navegador ou computador.</p></div></div>
+        </div>
+        <div class="backup-actions">
+          <button id="exportBackupButton" class="button button-outline" type="button">Baixar backup completo</button>
+          <button id="importBackupButton" class="button button-primary" type="button">Restaurar backup</button>
+          <input id="backupFileInput" type="file" accept=".json,application/json" hidden>
+        </div>
+        <p class="backup-note">O backup inclui lançamentos e jornadas personalizadas. A restauração substitui os dados locais atuais. Guarde o arquivo em local seguro; ele contém informações pessoais.</p>
       </section>
 
       <section class="panel form-panel">
@@ -192,7 +208,7 @@
           </div>
 
           <div class="form-footer">
-            <p class="privacy-hint"><span aria-hidden="true">ⓘ</span> Os registros ficam salvos neste navegador até a integração com uma planilha central.</p>
+            <p class="privacy-hint"><span aria-hidden="true">ⓘ</span> Os registros ficam salvos somente neste navegador. Faça backups periódicos para evitar perda de dados.</p>
             <div class="form-actions">
               <button class="button button-quiet" type="reset">Limpar</button>
               <button class="button button-primary" type="submit">
@@ -270,7 +286,7 @@
           <span>•</span>
           <span id="lastUpdated">Nenhum registro salvo</span>
           <span>•</span>
-          <span>Base contratual: 7h20 por dia</span>
+          <span>Jornada diária conforme configuração pessoal</span>
         </div>
       </section>
 
@@ -297,14 +313,14 @@
             <button id="generateIndividualReport" class="button button-primary" type="button">Gerar espelho</button>
           </div>
         </div>
-        <p class="individual-hint">O relatório considera somente os lançamentos salvos neste navegador e utiliza a apuração diária vigente de 7h20 por matrícula.</p>
+        <p class="individual-hint">O relatório considera os lançamentos salvos neste navegador e respeita a jornada diária configurada para a matrícula.</p>
         <div id="individualReportOutput" class="individual-report-output is-hidden" aria-live="polite"></div>
       </section>
     </main>
 
     <footer class="site-footer">
       <span>Controle de Ponto <span class="footer-separator">/</span> Operações</span>
-      <span>Jornada diária base 7h20 · Relatórios mensais · Exportação Excel</span>
+      <span>Controle pessoal · Relatórios mensais · Backup local</span>
     </footer>
   </div>
 </body>
