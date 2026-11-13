@@ -67,6 +67,18 @@
         </article>
       </section>
 
+      <section class="panel schedule-panel" aria-labelledby="scheduleTitle">
+        <div class="panel-heading"><div class="panel-title-wrap"><span class="section-index">00</span><div><h2 id="scheduleTitle">Minha jornada personalizada</h2><p>Configure a carga diária esperada para cada matrícula. O padrão continua sendo 7h20.</p></div></div></div>
+        <div class="schedule-controls">
+          <div class="field"><label for="scheduleRegistration">Matrícula</label><input id="scheduleRegistration" type="text" maxlength="30" placeholder="Informe sua matrícula"></div>
+          <div class="field"><label for="schedulePreset">Carga diária esperada</label><select id="schedulePreset"><option value="240">4 horas</option><option value="360">6 horas</option><option value="440" selected>7h20 (padrão)</option><option value="480">8 horas</option><option value="720">12 horas (ex.: escala 12x36)</option><option value="custom">Personalizada</option></select></div>
+          <div class="field is-hidden" id="customScheduleField"><label for="customScheduleTime">Carga diária (HH:MM)</label><input id="customScheduleTime" type="time" value="07:20"></div>
+          <div class="schedule-actions"><button id="saveScheduleButton" class="button button-primary" type="button">Salvar jornada</button><button id="resetScheduleButton" class="button button-quiet" type="button">Usar padrão</button></div>
+        </div>
+        <p class="schedule-feedback" id="scheduleFeedback" role="status" aria-live="polite">A jornada padrão é de 7h20 por dia. Cadastre uma matrícula para personalizar.</p>
+        <div class="schedule-note">A carga configurada é aplicada aos lançamentos daquela matrícula e à apuração diária de horas extras. Em escalas como 12x36, configure 12h como referência por dia trabalhado; o sistema não monta automaticamente o calendário de plantões.</div>
+      </section>
+
       <section class="panel form-panel">
         <div class="panel-heading">
           <div class="panel-title-wrap">
