@@ -118,6 +118,7 @@
   }
 
   function getWorkMetrics(record) {
+    if (record.serviceType === "Intervalo" || record.serviceType === "Folga") return { elapsedMinutes: 0, intervalMinutes: 0, workedMinutes: 0, regularMinutes: 0, overtimeMinutes: 0 };
     const start = parseLocalDateTime(record.startDate, record.startTime);
     const end = parseLocalDateTime(record.endDate, record.endTime);
     if (!start || !end || end <= start) {
@@ -157,6 +158,7 @@
     ordered.forEach((record) => {
       const rawMetrics = getWorkMetrics(record);
       if (rawMetrics.error) { result.set(record, rawMetrics); return; }
+      if (record.serviceType === "Intervalo" || record.serviceType === "Folga") { result.set(record, { ...rawMetrics, dailyWorkedMinutes: 0, dailyOvertimeMinutes: 0 }); return; }
       const dailyKey = normalizeRegistration(record.registration) + "|" + (record.startDate || "");
       const alreadyAllocated = dailyTotals.get(dailyKey) || 0;
       const regularMinutes = Math.min(rawMetrics.workedMinutes, Math.max(0, CONTRACT_MINUTES - alreadyAllocated));
@@ -184,7 +186,28 @@
   }
 
   function toggleRouteFields() {
-    const isTrip = serviceType.value === "Viagem";
+    const type = serviceType.value;
+    const isTrip = type === "Viagem";
+    const isFolga = type === "Folga";
+    const workOnly = type === "Plantão" || type === "Viagem";
+    const timed = !isFolga;
+    const startTimeField = document.getElementById("startTimeField");
+    const endDateField = document.getElementById("endDateField");
+    const endTimeField = document.getElementById("endTimeField");
+    const intervalField = document.getElementById("intervalField");
+    startTimeField.classList.toggle("is-hidden", !timed);
+    endDateField.classList.toggle("is-hidden", !timed);
+    endTimeField.classList.toggle("is-hidden", !timed);
+    intervalField.classList.toggle("is-hidden", !workOnly);
+    startTimeInput.disabled = !timed;
+    endDateInput.disabled = !timed;
+    endTimeInput.disabled = !timed;
+    intervalInput.disabled = !workOnly;
+    startTimeInput.required = timed;
+    endDateInput.required = timed;
+    endTimeInput.required = timed;
+    if (!timed) { startTimeInput.value = ""; endDateInput.value = ""; endTimeInput.value = ""; }
+    if (!workOnly) intervalInput.value = "";
     const vehicleOrderField = document.getElementById("vehicleOrderField");
     const plateField = document.getElementById("plateField");
     const vehicleOrderInput = document.getElementById("vehicleOrder");
@@ -213,6 +236,18 @@
   }
 
   function updateDurationPreview() {
+    if (serviceType.value === "Folga") {
+      durationPreview.classList.add("is-ready");
+      durationPreview.textContent = startDateInput.value ? "Folga em " + formatDate(startDateInput.value) + ". Nenhuma hora será contabilizada." : "Selecione a data da folga.";
+      return;
+    }
+    if (serviceType.value === "Intervalo") {
+      const a = parseLocalDateTime(startDateInput.value, startTimeInput.value);
+      const b = parseLocalDateTime(endDateInput.value, endTimeInput.value);
+      if (!a || !b || b <= a) { durationPreview.classList.remove("is-ready"); durationPreview.textContent = "Informe início e término do intervalo. Ele não será contabilizado como jornada."; }
+      else { durationPreview.classList.add("is-ready"); durationPreview.textContent = "Intervalo de " + formatMinutes(Math.floor((b-a)/60000)) + ". Não gera horas trabalhadas ou extras."; }
+      return;
+    }
     const start = parseLocalDateTime(startDateInput.value, startTimeInput.value);
     const end = parseLocalDateTime(endDateInput.value, endTimeInput.value);
     if (!start || !end) {
@@ -252,10 +287,10 @@
       fullName: String(data.get("fullName") || "").trim(),
       registration: String(data.get("registration") || "").trim(),
       startDate: String(data.get("startDate") || ""),
-      startTime: String(data.get("startTime") || ""),
+      startTime: serviceType.value === "Folga" ? "" : String(data.get("startTime") || ""),
       interval: String(data.get("interval") || "").trim(),
-      endDate: String(data.get("endDate") || ""),
-      endTime: String(data.get("endTime") || ""),
+      endDate: serviceType.value === "Folga" ? "" : String(data.get("endDate") || ""),
+      endTime: serviceType.value === "Folga" ? "" : String(data.get("endTime") || ""),
       vehicleOrder: serviceType.value === "Viagem" ? String(data.get("vehicleOrder") || "").trim() : "",
       plate: serviceType.value === "Viagem" ? String(data.get("plate") || "").trim().toUpperCase() : "",
       serviceType: String(data.get("serviceType") || ""),
@@ -266,18 +301,16 @@
   }
 
   function validateRecord(record) {
-    const requiredFields = [
-      ["Nome completo", record.fullName],
-      ["Matrícula", record.registration],
-      ["Data inicial", record.startDate],
-      ["Horário inicial", record.startTime],
-      ["Data final", record.endDate],
-      ["Horário final", record.endTime],
-      ["Tipo de serviço", record.serviceType]
-    ];
+    const requiredFields = [["Nome completo", record.fullName], ["Matrícula", record.registration], ["Data", record.startDate], ["Tipo de serviço", record.serviceType]];
+    if (record.serviceType !== "Folga") requiredFields.push(["Horário inicial", record.startTime], ["Data final", record.endDate], ["Horário final", record.endTime]);
     const missing = requiredFields.find(([, value]) => !value);
     if (missing) return "Preencha o campo obrigatório: " + missing[0] + ".";
-    if (record.serviceType !== "Plantão" && record.serviceType !== "Viagem") return "Selecione Plantão ou Viagem.";
+    if (!["Plantão", "Viagem", "Intervalo", "Folga"].includes(record.serviceType)) return "Selecione um tipo de serviço válido.";
+    if (record.serviceType === "Folga") return "";
+    if (record.serviceType === "Intervalo") {
+      const a = parseLocalDateTime(record.startDate, record.startTime), b = parseLocalDateTime(record.endDate, record.endTime);
+      return (!a || !b || b <= a) ? "O término do intervalo deve ser posterior ao início." : "";
+    }
     if (record.serviceType === "Viagem") {
       if (!record.vehicleOrder) return "Informe o nº de ordem do veículo para a viagem.";
       if (!record.plate) return "Informe a placa do veículo para a viagem.";
@@ -293,6 +326,7 @@
   }
 
   function getRecordPeriod(record) {
+    if (record.serviceType === "Folga" || record.serviceType === "Intervalo") return null;
     const start = parseLocalDateTime(record.startDate, record.startTime);
     const end = parseLocalDateTime(record.endDate, record.endTime);
     if (!start || !end || end <= start) return null;
@@ -450,7 +484,8 @@
         row.append(createStackCell(record.fullName || "—", "Matrícula: " + (record.registration || "—"), "person-cell"));
 
         const intervalLabel = metrics.error ? (record.interval || "não informado") : formatMinutes(metrics.intervalMinutes);
-        row.append(createStackCell(formatDate(record.startDate), (record.startTime || "—") + " → " + formatDate(record.endDate) + " " + (record.endTime || "") + " · Intervalo: " + intervalLabel, "date-cell"));
+        const periodLabel = record.serviceType === "Folga" ? "Folga · Dia sem jornada" : (record.startTime || "—") + " → " + formatDate(record.endDate) + " " + (record.endTime || "") + (record.serviceType === "Intervalo" ? " · Não contabilizado" : " · Intervalo descontado: " + intervalLabel);
+        row.append(createStackCell(formatDate(record.startDate), periodLabel, "date-cell"));
 
         const serviceCell = document.createElement("td");
         const pill = document.createElement("span");
@@ -946,9 +981,9 @@
       const service = record.serviceType === "Viagem"
         ? "Viagem" + (record.origin || record.destination ? " (" + (record.origin || "—") + " → " + (record.destination || "—") + ")" : "")
         : (record.serviceType || "Serviço");
-      day.shifts.push((record.startTime || "—") + "–" + (record.endTime || "—") +
-        (record.endDate && record.endDate !== record.startDate ? " (" + formatDate(record.endDate) + ")" : "") +
-        " · " + service + " · Intervalo: " + (record.interval || "não informado"));
+      if (record.serviceType === "Folga") day.shifts.push("FOLGA · Nenhuma hora contabilizada");
+      else if (record.serviceType === "Intervalo") day.shifts.push("INTERVALO · " + record.startTime + "–" + record.endTime + " · Não contabilizado");
+      else day.shifts.push((record.startTime || "—") + "–" + (record.endTime || "—") + (record.endDate && record.endDate !== record.startDate ? " (" + formatDate(record.endDate) + ")" : "") + " · " + service + " · Intervalo descontado: " + (record.interval || "não informado"));
     });
 
     const first = employeeRecords.find((record) => record.fullName);
@@ -1082,6 +1117,7 @@
 
   serviceType.addEventListener("change", () => {
     toggleRouteFields();
+    updateDurationPreview();
     clearFeedback();
   });
 
