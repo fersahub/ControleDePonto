@@ -12,7 +12,7 @@ Formulário web para lançamento, consulta e exportação de registros de jornad
 - Filtro mensal no histórico do site; a impressão respeita o mês selecionado.
 - Exportação para Excel (.xlsx) com quatro abas: **Lançamentos**, **Resumo mensal**, **Resumo por colaborador** e **Instruções**.
 - Resumo individual agrupado por competência + matrícula, com lançamentos, plantões, viagens, jornada bruta, horas trabalhadas e horas extras.
-- Filtros automáticos por competência, colaborador e matrícula no resumo individual; a impressão pode ser feita após aplicar os filtros.
+- Filtros automáticos por competência, colaborador e matrícula no resumo individual; para impressão, aplique os filtros e use Arquivo → Imprimir, preferencialmente em A4 e orientação paisagem.
 - Filtro automático por coluna na planilha, incluindo Competência (mês).
 - Exportação alternativa em CSV.
 
@@ -38,6 +38,6 @@ A competência mensal usa o mês da **Data inicial** do lançamento. O cálculo 
 
 Esta versão é estática. Os registros ficam no `localStorage` do navegador utilizado, portanto não são sincronizados entre computadores, navegadores ou usuários. Limpar os dados do navegador pode apagar os registros locais.
 
-A exportação Excel inclui todos os registros armazenados naquele navegador. Use o filtro da coluna **Competência** na aba **Lançamentos** para selecionar um mês. No site, o filtro mensal limita o histórico e a impressão. A exportação Excel exige acesso ao CDN oficial SheetJS.
+A exportação Excel inclui todos os registros armazenados naquele navegador. Use o filtro da coluna **Competência** na aba **Lançamentos** para selecionar um mês. Na aba **Resumo por colaborador**, filtre Competência, Colaborador ou Matrícula para consultar e imprimir o resumo individual. Depois de filtrar, use Arquivo → Imprimir; recomenda-se papel A4, orientação paisagem e ajuste à largura de uma página. No site, o filtro mensal limita o histórico e a impressão. A exportação Excel exige acesso ao CDN oficial SheetJS.
 
 O cálculo é operacional, baseado na jornada configurada de 7h20 e no intervalo informado. Regras específicas de folha, adicionais noturnos, feriados, DSR ou convenções coletivas não são aplicadas. Antes de utilizar o sistema como controle oficial de ponto, implemente armazenamento central, autenticação, auditoria, backups e políticas de acesso.
