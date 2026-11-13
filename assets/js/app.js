@@ -103,13 +103,9 @@
       const registration = String(item.registration || "").trim();
       const startDate = String(item.startDate || "");
       const service = String(item.serviceType || "");
-      if (!registration || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !validTypes.includes(service)) { rejected += 1; return; }
-      let id = String(item.id || "");
-      if (!id || usedIds.has(id)) id = "restaurado-" + Date.now() + "-" + Math.random().toString(16).slice(2);
-      usedIds.add(id);
       const stringValue = (value) => typeof value === "string" ? value : "";
-      normalized.push({
-        id,
+      const candidate = {
+        id: String(item.id || ""),
         fullName: stringValue(item.fullName).trim(),
         registration,
         startDate,
@@ -118,12 +114,21 @@
         endDate: stringValue(item.endDate),
         endTime: stringValue(item.endTime),
         vehicleOrder: stringValue(item.vehicleOrder),
-        plate: stringValue(item.plate).toUpperCase(),
+        plate: stringValue(item.plate).trim().toUpperCase(),
         serviceType: service,
-        origin: stringValue(item.origin),
-        destination: stringValue(item.destination),
+        origin: stringValue(item.origin).trim(),
+        destination: stringValue(item.destination).trim(),
         createdAt: stringValue(item.createdAt) || new Date().toISOString()
-      });
+      };
+      if (!TimeEngine.isValidDateString(startDate) || !validTypes.includes(service) || validateRecord(candidate)) {
+        rejected += 1;
+        return;
+      }
+      let id = candidate.id;
+      if (!id || usedIds.has(id)) id = "restaurado-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+      usedIds.add(id);
+      candidate.id = id;
+      normalized.push(candidate);
     });
     return { records: normalized, rejected };
   }
@@ -373,6 +378,7 @@
     if (record.serviceType !== "Folga") requiredFields.push(["Horário inicial", record.startTime], ["Data final", record.endDate], ["Horário final", record.endTime]);
     const missing = requiredFields.find(([, value]) => !value);
     if (missing) return "Preencha o campo obrigatório: " + missing[0] + ".";
+    if (!TimeEngine.isValidDateString(record.startDate)) return "Informe uma data inicial válida.";
     if (!["Plantão", "Viagem", "Intervalo", "Folga"].includes(record.serviceType)) return "Selecione um tipo de serviço válido.";
     if (record.serviceType === "Folga") return "";
     if (record.serviceType === "Intervalo") {
