@@ -60,6 +60,12 @@ async function run() {
     check(await page.title() === "Meu Controle de Jornada", "Título da versão pessoal");
     check(await page.locator("#schedulePreset").count() === 1, "Seção de jornada personalizada visível");
     check(await page.evaluate(() => !!window.TimeEngine), "Motor de cálculo carregado antes do app");
+    check(await page.locator(".side-nav").count() === 1, "Navegação lateral presente");
+    for (const target of ["#overview", "#scheduleTitle", "#shiftPlannerPanel", "#newRecordPanel", "#recordsPanel", "#individualReportPanel", "#backupTitle"]) {
+      check(await page.locator('.side-nav a[href="' + target + '"]').count() === 1, "Atalho de navegação válido: " + target);
+      check(await page.locator(target).count() === 1, "Destino da navegação existe: " + target);
+    }
+
 
     // Custom daily target and a shift with deducted break.
     await page.locator("#scheduleRegistration").fill("TESTE-001");
