@@ -61,6 +61,15 @@ async function run() {
     check(await page.locator("#schedulePreset").count() === 1, "Seção de jornada personalizada visível");
     check(await page.evaluate(() => !!window.TimeEngine), "Motor de cálculo carregado antes do app");
     check(await page.locator(".dashboard-intro").count() === 1, "Resumo visual do dashboard presente");
+    const desktopVisuals = await page.evaluate(() => ({
+      navDisplay: getComputedStyle(document.querySelector(".side-nav")).display,
+      navLinkDecoration: getComputedStyle(document.querySelector(".side-nav-link")).textDecorationLine,
+      introDisplay: getComputedStyle(document.querySelector(".dashboard-intro")).display,
+      introBorder: getComputedStyle(document.querySelector(".dashboard-intro")).borderTopStyle
+    }));
+    check(desktopVisuals.navDisplay === "flex", "Navegação lateral realmente estilizada: " + JSON.stringify(desktopVisuals));
+    check(desktopVisuals.navLinkDecoration === "none", "Links do menu sem sublinhado padrão");
+    check(desktopVisuals.introDisplay === "grid" && desktopVisuals.introBorder === "solid", "Painel de resumo com grade e contorno visual");
     check(await page.locator(".dashboard-intro-actions a[href='#newRecordPanel']").count() === 1, "Ação rápida para novo lançamento");
     check(await page.locator(".dashboard-intro-actions a[href='#recordsPanel']").count() === 1, "Ação rápida para histórico");
     check(await page.locator(".stat-card").count() === 4, "Quatro indicadores originais preservados");

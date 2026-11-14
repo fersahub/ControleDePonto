@@ -81,6 +81,7 @@ jobs:
             fi
             sleep 5
           done
+          curl --fail --silent --show-error --location "${PAGE_URL%/}/assets/css/dashboard.css?v=dashboard-1" | grep -q "\\.side-nav"
           curl --fail --silent --show-error --location "${PAGE_URL%/}/assets/js/time-engine.js" | node --check
           curl --fail --silent --show-error --location "${PAGE_URL%/}/assets/js/app.js" | node --check
           curl --fail --silent --show-error --location "${PAGE_URL%/}/manifest.webmanifest" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const m=JSON.parse(s);if(!m.icons.some(i=>i.sizes==='192x192')||!m.icons.some(i=>i.sizes==='512x512'))process.exit(1);})"

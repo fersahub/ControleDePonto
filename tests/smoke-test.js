@@ -25,9 +25,10 @@ const assetRefs = [
 const missingAssets = [...new Set(assetRefs)].filter((ref) => !fs.existsSync(path.join(root, ref.replace(/^\.\//, ""))));
 if (missingAssets.length) throw new Error("Arquivos locais referenciados e ausentes: " + missingAssets.join(", "));
 
-const engineScriptIndex = html.indexOf('<script src="assets/js/time-engine.js" defer></script>');
-const scheduleEngineScriptIndex = html.indexOf('<script src="assets/js/schedule-engine.js" defer></script>');
-const appScriptIndex = html.indexOf('<script src="assets/js/app.js" defer></script>');
+const scriptRefs = [...html.matchAll(/<script\\s+src=["']([^"']+)["']/g)].map((match) => match[1].split(/[?#]/)[0]);
+const engineScriptIndex = scriptRefs.indexOf("assets/js/time-engine.js");
+const scheduleEngineScriptIndex = scriptRefs.indexOf("assets/js/schedule-engine.js");
+const appScriptIndex = scriptRefs.indexOf("assets/js/app.js");
 if (engineScriptIndex < 0 || scheduleEngineScriptIndex < 0 || appScriptIndex < 0 || engineScriptIndex > scheduleEngineScriptIndex || scheduleEngineScriptIndex > appScriptIndex) throw new Error("Os motores de cálculo devem carregar antes do aplicativo.");
 if (!engine.includes("calculateDailyMetrics") || !engine.includes("parseIntervalMinutes")) throw new Error("Motor de cálculo incompleto.");
 if (!scheduleEngine.includes("buildForecast") || !scheduleEngine.includes("normalizeConfig")) throw new Error("Motor de escalas incompleto.");
