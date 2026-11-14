@@ -78,3 +78,31 @@ O site pode ser instalado como aplicativo e abrir offline depois que os arquivos
 - A limpeza dos dados do navegador, perda do dispositivo ou falha física pode causar perda dos registros; mantenha cópias de backup fora do navegador.
 - O aplicativo é um organizador pessoal de jornada e não deve ser apresentado como sistema oficial de registro eletrônico de ponto nem como substituto de obrigações legais trabalhistas.
 - A jornada personalizada desta versão define uma carga diária por matrícula. Calendários semanais/cíclicos (5x2, 6x1, 12x36), feriados, adicional noturno, DSR e regras de convenções ainda não são calculados automaticamente.
+
+
+## Planejador de escalas
+
+A seção **Planejador de escalas** salva uma configuração independente por matrícula e projeta 30 ou 60 dias de trabalho, descanso e lançamentos:
+
+- **5x2:** cinco dias trabalhados e dois dias sem turno, repetidos a partir da data-base informada.
+- **6x1:** seis dias trabalhados e um dia sem turno, repetidos a partir da data-base informada.
+- **12x36:** turno de 12 horas seguido por 36 horas de descanso, calculado a partir da data e do horário da primeira entrada. Turnos noturnos também são indicados como continuação no dia seguinte.
+- **Personalizada:** permite definir quantos dias são trabalhados e quantos são de descanso em cada ciclo.
+
+A projeção considera entrada, duração do turno e intervalo planejado. O calendário cruza as datas de trabalho com lançamentos de Plantão e Viagem da mesma matrícula. Dias passados de trabalho sem lançamento são sinalizados como **Sem lançamento**; isso não significa falta ou ausência, pois o aplicativo não conhece justificativas, atestados, férias ou alterações feitas pelo empregador.
+
+As escalas ficam no armazenamento local e entram nos backups versão 2. O aplicativo continua aceitando backups anteriores versão 1. O planejamento não altera lançamentos, a jornada diária personalizada nem o cálculo atual de horas extras. A apuração continua diária, conforme a carga configurada em **Minha jornada personalizada**; o planejador não calcula limites semanais, DSR, adicional noturno, feriados ou regras legais/convenções.
+
+
+## Planejador de escalas
+
+A seção **Planejador de escalas** salva uma configuração independente por matrícula e projeta 30 ou 60 dias de trabalho, descanso e lançamentos:
+
+- **5x2:** cinco dias trabalhados e dois dias sem turno, repetidos a partir da data-base informada.
+- **6x1:** seis dias trabalhados e um dia sem turno, repetidos a partir da data-base informada.
+- **12x36:** turno de 12 horas seguido por 36 horas de descanso, calculado a partir da data e do horário da primeira entrada. Turnos noturnos também são indicados como continuação no dia seguinte.
+- **Personalizada:** permite definir quantos dias são trabalhados e quantos são de descanso em cada ciclo.
+
+A projeção considera entrada, duração do turno e intervalo planejado. O calendário cruza as datas de trabalho com lançamentos de Plantão e Viagem da mesma matrícula. Dias passados de trabalho sem lançamento são sinalizados como **Sem lançamento**; isso não significa falta ou ausência, pois o aplicativo não conhece justificativas, atestados, férias ou alterações feitas pelo empregador.
+
+As escalas ficam no armazenamento local e entram nos backups versão 2. O aplicativo continua aceitando backups anteriores versão 1. O planejamento não altera lançamentos, a jornada diária personalizada nem o cálculo atual de horas extras. A apuração continua diária, conforme a carga configurada em **Minha jornada personalizada**; o planejador não calcula limites semanais, DSR, adicional noturno, feriados ou regras legais/convenções.

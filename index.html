@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="assets/css/style.css">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script src="assets/js/time-engine.js" defer></script>
+  <script src="assets/js/schedule-engine.js" defer></script>
   <script src="assets/js/app.js" defer></script>
 </head>
 <body>
@@ -83,6 +84,62 @@
         </div>
         <p class="schedule-feedback" id="scheduleFeedback" role="status" aria-live="polite">A jornada padrão é de 7h20 por dia. Cadastre uma matrícula para personalizar.</p>
         <div class="schedule-note">A carga configurada é aplicada aos lançamentos da sua matrícula. Nesta versão, você define a carga diária; escalas cíclicas como 12x36 ainda não montam automaticamente o calendário de trabalho e descanso.</div>
+      </section>
+
+      <section class="panel shift-planner-panel" id="shiftPlannerPanel" aria-labelledby="shiftPlannerTitle">
+        <div class="panel-heading">
+          <div class="panel-title-wrap">
+            <span class="section-index">00B</span>
+            <div><h2 id="shiftPlannerTitle">Planejador de escalas</h2><p>Monte seu ciclo de trabalho e visualize os próximos dias de trabalho e descanso.</p></div>
+          </div>
+          <span class="planner-mode-label">Planejamento pessoal</span>
+        </div>
+        <div class="shift-planner-form">
+          <div class="field"><label for="shiftScheduleRegistration">Matrícula</label><input id="shiftScheduleRegistration" type="text" maxlength="30" placeholder="Informe a matrícula"></div>
+          <div class="field"><label for="shiftScheduleType">Modelo de escala</label><select id="shiftScheduleType">
+            <option value="5x2">5x2 · 5 dias de trabalho / 2 de descanso</option>
+            <option value="6x1">6x1 · 6 dias de trabalho / 1 de descanso</option>
+            <option value="12x36">12x36 · 12 horas de trabalho / 36 de descanso</option>
+            <option value="custom">Personalizada · ciclo próprio</option>
+          </select></div>
+          <div class="field"><label for="shiftAnchorDate">Data-base do ciclo</label><input id="shiftAnchorDate" type="date"><small class="field-hint">Primeiro dia trabalhado da sequência.</small></div>
+          <div class="field"><label for="shiftStartTime">Entrada prevista</label><input id="shiftStartTime" type="time" value="08:00"></div>
+          <div class="field"><label for="shiftDuration">Duração do turno</label><input id="shiftDuration" type="time" value="08:00"></div>
+          <div class="field"><label for="shiftInterval">Intervalo previsto</label><input id="shiftInterval" type="time" value="00:00"></div>
+          <div class="field shift-custom-field is-hidden" id="shiftCustomWorkField"><label for="shiftCustomWorkDays">Dias trabalhados no ciclo</label><input id="shiftCustomWorkDays" type="number" min="1" max="31" value="2"></div>
+          <div class="field shift-custom-field is-hidden" id="shiftCustomRestField"><label for="shiftCustomRestDays">Dias de descanso no ciclo</label><input id="shiftCustomRestDays" type="number" min="1" max="31" value="2"></div>
+          <div class="shift-planner-actions">
+            <button id="saveShiftScheduleButton" class="button button-primary" type="button">Salvar escala</button>
+            <button id="deleteShiftScheduleButton" class="button button-quiet" type="button">Excluir escala</button>
+          </div>
+        </div>
+        <div class="shift-saved-controls">
+          <label for="savedShiftScheduleSelect">Escalas salvas</label>
+          <select id="savedShiftScheduleSelect"><option value="">Nenhuma escala salva</option></select>
+          <button id="loadShiftScheduleButton" class="button button-outline" type="button">Carregar escala</button>
+        </div>
+        <p class="shift-planner-feedback" id="shiftScheduleFeedback" role="status" aria-live="polite">Escolha o modelo, informe a matrícula e a data-base para começar.</p>
+        <div class="shift-planner-note">
+          <strong>Como funciona:</strong> em 5x2 e 6x1, a data-base é o primeiro dia trabalhado e o ciclo se repete a partir dela. No 12x36, informe a data e o horário da primeira entrada. A escala personalizada permite definir quantos dias trabalha e quantos descansa.
+          <br><strong>Importante:</strong> este calendário é um planejador. Ele não altera lançamentos, a jornada diária configurada nem o cálculo atual de horas extras. “Sem lançamento” apenas indica que não há registro de trabalho associado àquela data.
+        </div>
+        <div class="shift-calendar-header">
+          <div><h3 id="shiftCalendarTitle">Projeção da escala</h3><p id="shiftCalendarCaption">Salve ou carregue uma escala para visualizar o calendário.</p></div>
+          <div class="shift-calendar-controls">
+            <div class="field"><label for="planCalendarStartDate">Início da projeção</label><input id="planCalendarStartDate" type="date"></div>
+            <div class="field"><label for="planHorizon">Período</label><select id="planHorizon"><option value="30">30 dias</option><option value="60">60 dias</option></select></div>
+          </div>
+        </div>
+        <div class="shift-summary-grid" aria-label="Resumo do período projetado">
+          <div class="shift-summary-card"><span>Dias de trabalho</span><strong id="plannedWorkDays">0</strong></div>
+          <div class="shift-summary-card"><span>Dias sem turno</span><strong id="plannedRestDays">0</strong></div>
+          <div class="shift-summary-card"><span>Dias com lançamento</span><strong id="plannedRecordedDays">0</strong></div>
+          <div class="shift-summary-card"><span>Sem lançamento (passados)</span><strong id="plannedMissingDays">0</strong></div>
+        </div>
+        <div class="shift-calendar-wrap"><table class="shift-calendar-table">
+          <thead><tr><th>Data</th><th>Planejamento</th><th>Registros</th><th>Situação</th></tr></thead>
+          <tbody id="shiftCalendarBody"><tr><td colspan="4" class="shift-empty-cell">Informe uma matrícula para visualizar a projeção.</td></tr></tbody>
+        </table></div>
       </section>
 
       <section class="panel backup-panel" aria-labelledby="backupTitle">

@@ -79,6 +79,36 @@ async function run() {
     }));
     check(scheduleResult.saved["TESTE-001"] === 480, "Jornada personalizada salva: " + JSON.stringify(scheduleResult));
 
+    // Planner saves and projects independent work/rest cycles.
+    await page.locator("#shiftScheduleRegistration").fill("PLAN-001");
+    await page.locator("#shiftScheduleType").selectOption("6x1");
+    await page.locator("#shiftAnchorDate").fill("2026-11-10");
+    await page.locator("#shiftStartTime").fill("08:00");
+    await page.locator("#shiftDuration").fill("08:00");
+    await page.locator("#shiftInterval").fill("01:00");
+    await page.locator("#planCalendarStartDate").fill("2026-11-10");
+    await page.locator("#saveShiftScheduleButton").click();
+    const sixOnePlanner = await page.evaluate(() => ({
+      saved: JSON.parse(localStorage.getItem("controleDePonto.escalas.v1") || "{}")["PLAN-001"],
+      kinds: [...document.querySelectorAll("#shiftCalendarBody tr")].slice(0, 7).map((row) => row.dataset.kind)
+    }));
+    check(sixOnePlanner.saved.type === "6x1", "Planejador salva escala separada por matrícula");
+    check(JSON.stringify(sixOnePlanner.kinds) === JSON.stringify(["work","work","work","work","work","work","rest"]), "Calendário projeta o ciclo 6x1");
+
+    await page.locator("#shiftScheduleRegistration").fill("PLAN-12");
+    await page.locator("#shiftScheduleType").selectOption("12x36");
+    await page.locator("#shiftAnchorDate").fill("2026-11-10");
+    await page.locator("#shiftStartTime").fill("18:00");
+    await page.locator("#planCalendarStartDate").fill("2026-11-10");
+    check(await page.locator("#shiftDuration").inputValue() === "12:00" && await page.locator("#shiftDuration").isDisabled(), "12x36 fixa o turno em 12 horas");
+    await page.locator("#saveShiftScheduleButton").click();
+    const twelvePlanner = await page.evaluate(() => ({
+      saved: JSON.parse(localStorage.getItem("controleDePonto.escalas.v1") || "{}")["PLAN-12"],
+      kinds: [...document.querySelectorAll("#shiftCalendarBody tr")].slice(0, 5).map((row) => row.dataset.kind)
+    }));
+    check(twelvePlanner.saved.durationMinutes === 720, "12x36 salva duração de 12 horas");
+    check(JSON.stringify(twelvePlanner.kinds) === JSON.stringify(["work","continuation","work","continuation","work"]), "Calendário identifica turnos noturnos e continuações no 12x36");
+
     // Required-field validation must stop an incomplete record.
     await page.locator("#serviceType").selectOption("Plantão");
     await page.locator("#startDate").fill("2026-11-12");
@@ -215,10 +245,12 @@ async function run() {
     const backupPath = await backupDownload.path();
     const backup = JSON.parse(fs.readFileSync(backupPath, "utf8"));
     check(backup.records.length === 5 && backup.schedules["TESTE-001"] === 480, "Backup contém registros e jornada personalizada");
+    check(backup.backupVersion === 2 && backup.shiftSchedules["PLAN-001"].type === "6x1" && backup.shiftSchedules["PLAN-12"].type === "12x36", "Backup inclui escalas salvas");
 
     await page.evaluate(() => {
       localStorage.removeItem("controleDePonto.registros.v1");
       localStorage.removeItem("controleDePonto.jornadas.v1");
+      localStorage.removeItem("controleDePonto.escalas.v1");
     });
     await page.reload({ waitUntil: "domcontentloaded" });
     page.once("dialog", (dialog) => dialog.accept());
@@ -226,6 +258,7 @@ async function run() {
     await page.waitForFunction(() => JSON.parse(localStorage.getItem("controleDePonto.registros.v1") || "[]").length === 5);
     check(await page.locator("#recordsBody tr").count() === 5, "Restauração reconstitui histórico");
     check(await page.evaluate(() => JSON.parse(localStorage.getItem("controleDePonto.jornadas.v1") || "{}")["TESTE-001"]) === 480, "Restauração reconstitui jornada");
+    check(await page.evaluate(() => JSON.parse(localStorage.getItem("controleDePonto.escalas.v1") || "{}")["PLAN-12"].type) === "12x36", "Restauração reconstitui escala 12x36");
 
     // Mobile layout should not create page-level horizontal scrolling.
     await page.setViewportSize({ width: 390, height: 844 });

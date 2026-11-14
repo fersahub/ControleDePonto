@@ -3,6 +3,7 @@
 (() => {
   const STORAGE_KEY = "controleDePonto.registros.v1";
   const SCHEDULES_KEY = "controleDePonto.jornadas.v1";
+  const SHIFT_PLANS_KEY = "controleDePonto.escalas.v1";
   const CONTRACT_MINUTES = 7 * 60 + 20;
   const scheduleRegistrationInput = document.getElementById("scheduleRegistration");
   const schedulePreset = document.getElementById("schedulePreset");
@@ -10,6 +11,7 @@
   const customScheduleTime = document.getElementById("customScheduleTime");
   const scheduleFeedback = document.getElementById("scheduleFeedback");
   const schedules = loadSchedules();
+  const shiftPlans = loadShiftPlans();
   const form = document.getElementById("timeForm");
   const routeFields = document.getElementById("routeFields");
   const serviceType = document.getElementById("serviceType");
@@ -52,6 +54,226 @@
     try { localStorage.setItem(SCHEDULES_KEY, JSON.stringify(schedules)); return true; }
     catch (error) { scheduleFeedback.textContent = "Não foi possível salvar a jornada neste navegador."; return false; }
   }
+
+  function loadShiftPlans() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(SHIFT_PLANS_KEY) || "{}");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      const valid = {};
+      Object.entries(parsed).forEach(([registration, value]) => {
+        const key = normalizeRegistration(registration);
+        if (!key) return;
+        try { valid[key] = ScheduleEngine.normalizeConfig(value, key); }
+        catch (error) { console.warn("Escala local ignorada para " + key + ".", error); }
+      });
+      return valid;
+    } catch (error) {
+      console.warn("Não foi possível ler as escalas locais.", error);
+      return {};
+    }
+  }
+
+  function persistShiftPlans() {
+    try {
+      localStorage.setItem(SHIFT_PLANS_KEY, JSON.stringify(shiftPlans));
+      return true;
+    } catch (error) {
+      document.getElementById("shiftScheduleFeedback").textContent = "Não foi possível salvar a escala neste navegador. Verifique o espaço disponível.";
+      return false;
+    }
+  }
+
+  function normalizeBackupShiftPlans(source) {
+    if (source === undefined || source === null) return {};
+    if (typeof source !== "object" || Array.isArray(source)) throw new Error("A lista de escalas do backup está inválida.");
+    const normalized = {};
+    Object.entries(source).forEach(([registration, value]) => {
+      const key = normalizeRegistration(registration);
+      if (!key) return;
+      try { normalized[key] = ScheduleEngine.normalizeConfig(value, key); }
+      catch (error) { throw new Error("A escala da matrícula " + key + " é inválida: " + error.message); }
+    });
+    return normalized;
+  }
+
+  function parseClockMinutes(value) {
+    const match = String(value || "").match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+  }
+
+  function applyShiftPlanToForm(config) {
+    document.getElementById("shiftScheduleRegistration").value = config.registration;
+    document.getElementById("shiftScheduleType").value = config.type;
+    refreshShiftPlannerTypeFields();
+    document.getElementById("shiftAnchorDate").value = config.anchorDate;
+    document.getElementById("shiftStartTime").value = config.startTime;
+    document.getElementById("shiftDuration").value = String(Math.floor(config.durationMinutes / 60)).padStart(2, "0") + ":" + String(config.durationMinutes % 60).padStart(2, "0");
+    document.getElementById("shiftInterval").value = String(Math.floor(config.intervalMinutes / 60)).padStart(2, "0") + ":" + String(config.intervalMinutes % 60).padStart(2, "0");
+    document.getElementById("shiftCustomWorkDays").value = config.workDays;
+    document.getElementById("shiftCustomRestDays").value = config.restDays;
+    renderShiftCalendar();
+  }
+
+  function refreshShiftPlannerTypeFields() {
+    const type = document.getElementById("shiftScheduleType").value;
+    const custom = type === "custom";
+    document.getElementById("shiftCustomWorkField").classList.toggle("is-hidden", !custom);
+    document.getElementById("shiftCustomRestField").classList.toggle("is-hidden", !custom);
+    const duration = document.getElementById("shiftDuration");
+    duration.disabled = type === "12x36";
+    if (type === "12x36") duration.value = "12:00";
+  }
+
+  function readShiftPlanForm() {
+    const registration = normalizeRegistration(document.getElementById("shiftScheduleRegistration").value);
+    if (!registration) throw new Error("Informe a matrícula para visualizar ou salvar a escala.");
+    const durationMinutes = parseClockMinutes(document.getElementById("shiftDuration").value);
+    const intervalMinutes = parseClockMinutes(document.getElementById("shiftInterval").value);
+    if (durationMinutes === null || intervalMinutes === null) throw new Error("Informe duração e intervalo no formato HH:MM.");
+    return ScheduleEngine.normalizeConfig({
+      registration,
+      type: document.getElementById("shiftScheduleType").value,
+      anchorDate: document.getElementById("shiftAnchorDate").value,
+      startTime: document.getElementById("shiftStartTime").value,
+      durationMinutes,
+      intervalMinutes,
+      workDays: Number(document.getElementById("shiftCustomWorkDays").value),
+      restDays: Number(document.getElementById("shiftCustomRestDays").value)
+    }, registration);
+  }
+
+  function renderShiftScheduleOptions() {
+    const select = document.getElementById("savedShiftScheduleSelect");
+    const previous = select.value;
+    select.replaceChildren();
+    const keys = Object.keys(shiftPlans).sort();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = keys.length ? "Selecione uma escala salva" : "Nenhuma escala salva";
+    select.append(placeholder);
+    keys.forEach((key) => {
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = key + " · " + ScheduleEngine.typeLabel(shiftPlans[key].type);
+      select.append(option);
+    });
+    if (keys.includes(previous)) select.value = previous;
+    else if (keys.includes(normalizeRegistration(document.getElementById("shiftScheduleRegistration").value))) {
+      select.value = normalizeRegistration(document.getElementById("shiftScheduleRegistration").value);
+    }
+  }
+
+  function renderShiftCalendar() {
+    const body = document.getElementById("shiftCalendarBody");
+    if (!body) return;
+    const registration = normalizeRegistration(document.getElementById("shiftScheduleRegistration").value);
+    const empty = (message) => {
+      body.replaceChildren();
+      const row = document.createElement("tr"), cell = document.createElement("td");
+      cell.colSpan = 4; cell.className = "shift-empty-cell"; cell.textContent = message;
+      row.append(cell); body.append(row);
+      ["plannedWorkDays", "plannedRestDays", "plannedRecordedDays", "plannedMissingDays"].forEach((id) => {
+        document.getElementById(id).textContent = "0";
+      });
+      document.getElementById("shiftCalendarCaption").textContent = message;
+    };
+    if (!registration) {
+      empty("Informe uma matrícula para visualizar a projeção.");
+      document.getElementById("shiftCalendarTitle").textContent = "Projeção da escala";
+      return;
+    }
+    try {
+      const config = readShiftPlanForm();
+      const startDate = document.getElementById("planCalendarStartDate").value;
+      const horizon = Number(document.getElementById("planHorizon").value);
+      const recordCounts = {};
+      records.forEach((record) => {
+        if (normalizeRegistration(record.registration) !== registration ||
+            !TimeEngine.isValidDateString(record.startDate) ||
+            !["Plantão", "Viagem"].includes(record.serviceType)) return;
+        recordCounts[record.startDate] = (recordCounts[record.startDate] || 0) + 1;
+      });
+      const days = ScheduleEngine.buildForecast(config, startDate, horizon, recordCounts);
+      body.replaceChildren();
+      days.forEach((day) => {
+        const row = document.createElement("tr");
+        row.dataset.kind = day.kind;
+        const dateCell = document.createElement("td");
+        dateCell.className = "shift-calendar-date";
+        const parts = day.date.split("-").map(Number);
+        const date = new Date(parts[0], parts[1] - 1, parts[2]);
+        const dateLabel = document.createElement("span");
+        dateLabel.textContent = new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).format(date);
+        const yearLabel = document.createElement("small");
+        yearLabel.textContent = String(parts[0]);
+        dateCell.append(dateLabel, yearLabel);
+        const planCell = document.createElement("td");
+        planCell.textContent = day.detail;
+        const recordsCell = document.createElement("td");
+        recordsCell.textContent = day.recordCount ? day.recordCount + (day.recordCount === 1 ? " lançamento" : " lançamentos") : "—";
+        const statusCell = document.createElement("td");
+        const status = document.createElement("span");
+        status.className = "shift-status " + day.statusKey;
+        status.textContent = day.status;
+        statusCell.append(status);
+        row.append(dateCell, planCell, recordsCell, statusCell);
+        body.append(row);
+      });
+      const workDays = days.filter((day) => day.kind === "work").length;
+      const restDays = days.filter((day) => day.kind === "rest").length;
+      const recordedDays = days.filter((day) => day.kind === "work" && day.recordCount > 0).length;
+      const missingDays = days.filter((day) => day.statusKey === "missing").length;
+      document.getElementById("plannedWorkDays").textContent = String(workDays);
+      document.getElementById("plannedRestDays").textContent = String(restDays);
+      document.getElementById("plannedRecordedDays").textContent = String(recordedDays);
+      document.getElementById("plannedMissingDays").textContent = String(missingDays);
+      document.getElementById("shiftCalendarTitle").textContent = "Projeção · " + registration + " · " + ScheduleEngine.typeLabel(config.type);
+      document.getElementById("shiftCalendarCaption").textContent =
+        "Exibindo " + horizon + " dias a partir de " + formatDate(startDate) +
+        (shiftPlans[registration] ? " · escala salva neste navegador" : " · prévia da configuração atual");
+    } catch (error) {
+      empty(error.message || "Não foi possível montar a projeção.");
+    }
+  }
+
+  function saveShiftPlan() {
+    const feedbackElement = document.getElementById("shiftScheduleFeedback");
+    let config;
+    try { config = readShiftPlanForm(); }
+    catch (error) { feedbackElement.textContent = error.message; return; }
+    const previous = shiftPlans[config.registration];
+    shiftPlans[config.registration] = config;
+    if (!persistShiftPlans()) {
+      if (previous) shiftPlans[config.registration] = previous;
+      else delete shiftPlans[config.registration];
+      return;
+    }
+    renderShiftScheduleOptions();
+    renderShiftCalendar();
+    feedbackElement.textContent = "Escala " + ScheduleEngine.typeLabel(config.type) + " salva para a matrícula " + config.registration + ". Os lançamentos e o cálculo atual de horas extras não foram alterados.";
+  }
+
+  function deleteShiftPlan() {
+    const feedbackElement = document.getElementById("shiftScheduleFeedback");
+    const registration = normalizeRegistration(document.getElementById("shiftScheduleRegistration").value) ||
+      document.getElementById("savedShiftScheduleSelect").value;
+    if (!registration || !shiftPlans[registration]) {
+      feedbackElement.textContent = "Selecione ou informe uma matrícula com escala salva.";
+      return;
+    }
+    if (!window.confirm("Excluir a escala da matrícula " + registration + "? Os lançamentos existentes serão preservados.")) return;
+    const previous = shiftPlans[registration];
+    delete shiftPlans[registration];
+    if (!persistShiftPlans()) { shiftPlans[registration] = previous; return; }
+    if (normalizeRegistration(document.getElementById("shiftScheduleRegistration").value) === registration) {
+      document.getElementById("shiftScheduleRegistration").value = "";
+    }
+    renderShiftScheduleOptions();
+    renderShiftCalendar();
+    feedbackElement.textContent = "Escala excluída. Os lançamentos e demais jornadas foram mantidos.";
+  }
+
+
   function getDailyTargetMinutes(registration) {
     return TimeEngine.getDailyTargetMinutes(registration, schedules, CONTRACT_MINUTES);
   }
@@ -84,10 +306,11 @@
   function exportBackup() {
     const backup = {
       application: "controle-de-ponto",
-      backupVersion: 1,
+      backupVersion: 2,
       exportedAt: new Date().toISOString(),
       records,
-      schedules
+      schedules,
+      shiftSchedules: shiftPlans
     };
     downloadJsonFile("backup-controle-de-jornada-" + localDateString() + ".json", backup);
     showFeedback("Backup completo gerado. Guarde o arquivo em local seguro.", "success");
@@ -139,12 +362,13 @@
     try {
       if (file.size > 10 * 1024 * 1024) throw new Error("O arquivo ultrapassa o limite de 10 MB.");
       const backup = JSON.parse(await file.text());
-      if (!backup || backup.application !== "controle-de-ponto" || backup.backupVersion !== 1 ||
+      if (!backup || backup.application !== "controle-de-ponto" || ![1, 2].includes(backup.backupVersion) ||
           !Array.isArray(backup.records) || !backup.schedules || typeof backup.schedules !== "object" || Array.isArray(backup.schedules)) {
         throw new Error("Este arquivo não é um backup válido do ControleDePonto.");
       }
       const normalized = normalizeBackupRecords(backup.records);
       if (backup.records.length && !normalized.records.length) throw new Error("Nenhum lançamento válido foi encontrado no backup.");
+      const restoredShiftPlans = normalizeBackupShiftPlans(backup.shiftSchedules || {});
       const restoredSchedules = {};
       Object.entries(backup.schedules).forEach(([registration, minutes]) => {
         const key = normalizeRegistration(registration);
@@ -155,22 +379,28 @@
 
       const previousRecords = localStorage.getItem(STORAGE_KEY);
       const previousSchedules = localStorage.getItem(SCHEDULES_KEY);
+      const previousShiftPlans = localStorage.getItem(SHIFT_PLANS_KEY);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized.records));
         localStorage.setItem(SCHEDULES_KEY, JSON.stringify(restoredSchedules));
+        localStorage.setItem(SHIFT_PLANS_KEY, JSON.stringify(restoredShiftPlans));
       } catch (storageError) {
         if (previousRecords === null) localStorage.removeItem(STORAGE_KEY); else localStorage.setItem(STORAGE_KEY, previousRecords);
         if (previousSchedules === null) localStorage.removeItem(SCHEDULES_KEY); else localStorage.setItem(SCHEDULES_KEY, previousSchedules);
+        if (previousShiftPlans === null) localStorage.removeItem(SHIFT_PLANS_KEY); else localStorage.setItem(SHIFT_PLANS_KEY, previousShiftPlans);
         throw new Error("Não foi possível restaurar os dados neste navegador. " + storageError.message);
       }
       records = normalized.records;
       Object.keys(schedules).forEach((key) => delete schedules[key]);
       Object.assign(schedules, restoredSchedules);
+      Object.keys(shiftPlans).forEach((key) => delete shiftPlans[key]);
+      Object.assign(shiftPlans, restoredShiftPlans);
+      renderShiftScheduleOptions();
       renderRecords();
       updateDurationPreview();
       refreshScheduleForm();
       individualReportOutput.classList.add("is-hidden");
-      showFeedback("Backup restaurado: " + records.length + " lançamento(s) e " + Object.keys(schedules).length + " jornada(s)." +
+      showFeedback("Backup restaurado: " + records.length + " lançamento(s), " + Object.keys(schedules).length + " jornada(s) e " + Object.keys(shiftPlans).length + " escala(s)." +
         (normalized.rejected ? " " + normalized.rejected + " registro(s) inválido(s) foram ignorados." : ""), "success");
     } catch (error) {
       showFeedback(error.message || "Não foi possível ler o arquivo de backup.", "error");
@@ -623,6 +853,7 @@
     } else {
       document.getElementById("lastUpdated").textContent = "Nenhum registro salvo";
     }
+    renderShiftCalendar();
   }
 
   function csvEscape(value) {
@@ -1214,6 +1445,36 @@
     renderRecords(); updateDurationPreview(); refreshScheduleForm();
     scheduleFeedback.textContent = "Matrícula "+key+" restaurada para a jornada padrão de 7h20.";
   });
+  
+  document.getElementById("shiftScheduleType").addEventListener("change", () => {
+    refreshShiftPlannerTypeFields();
+    renderShiftCalendar();
+  });
+  document.getElementById("shiftScheduleRegistration").addEventListener("input", renderShiftCalendar);
+  document.getElementById("shiftScheduleRegistration").addEventListener("change", (event) => {
+    const key = normalizeRegistration(event.target.value);
+    if (key && shiftPlans[key]) applyShiftPlanToForm(shiftPlans[key]);
+    else renderShiftCalendar();
+  });
+  document.getElementById("savedShiftScheduleSelect").addEventListener("change", (event) => {
+    if (event.target.value && shiftPlans[event.target.value]) applyShiftPlanToForm(shiftPlans[event.target.value]);
+  });
+  document.getElementById("loadShiftScheduleButton").addEventListener("click", () => {
+    const key = document.getElementById("savedShiftScheduleSelect").value;
+    if (!key || !shiftPlans[key]) {
+      document.getElementById("shiftScheduleFeedback").textContent = "Selecione uma escala salva.";
+      return;
+    }
+    applyShiftPlanToForm(shiftPlans[key]);
+    document.getElementById("shiftScheduleFeedback").textContent = "Escala da matrícula " + key + " carregada.";
+  });
+  document.getElementById("saveShiftScheduleButton").addEventListener("click", saveShiftPlan);
+  document.getElementById("deleteShiftScheduleButton").addEventListener("click", deleteShiftPlan);
+  ["shiftAnchorDate", "shiftStartTime", "shiftDuration", "shiftInterval", "shiftCustomWorkDays", "shiftCustomRestDays", "planCalendarStartDate", "planHorizon"].forEach((id) => {
+    const input = document.getElementById(id);
+    input.addEventListener("input", renderShiftCalendar);
+    input.addEventListener("change", renderShiftCalendar);
+  });
 
   serviceType.addEventListener("change", () => {
     toggleRouteFields();
@@ -1262,6 +1523,10 @@
   refreshScheduleForm();
   startDateInput.value = localDateString();
   endDateInput.value = localDateString();
+  document.getElementById("shiftAnchorDate").value = localDateString();
+  document.getElementById("planCalendarStartDate").value = localDateString();
+  refreshShiftPlannerTypeFields();
+  renderShiftScheduleOptions();
   toggleRouteFields();
   updateDurationPreview();
   renderRecords();

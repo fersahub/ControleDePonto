@@ -6,6 +6,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const html = read("index.html");
 const js = read("assets/js/app.js");
 const engine = read("assets/js/time-engine.js");
+const scheduleEngine = read("assets/js/schedule-engine.js");
 const manifest = JSON.parse(read("manifest.webmanifest"));
 const sw = read("sw.js");
 
@@ -25,13 +26,15 @@ const missingAssets = [...new Set(assetRefs)].filter((ref) => !fs.existsSync(pat
 if (missingAssets.length) throw new Error("Arquivos locais referenciados e ausentes: " + missingAssets.join(", "));
 
 const engineScriptIndex = html.indexOf('<script src="assets/js/time-engine.js" defer></script>');
+const scheduleEngineScriptIndex = html.indexOf('<script src="assets/js/schedule-engine.js" defer></script>');
 const appScriptIndex = html.indexOf('<script src="assets/js/app.js" defer></script>');
-if (engineScriptIndex < 0 || appScriptIndex < 0 || engineScriptIndex > appScriptIndex) throw new Error("O motor de cálculo deve carregar antes do aplicativo.");
+if (engineScriptIndex < 0 || scheduleEngineScriptIndex < 0 || appScriptIndex < 0 || engineScriptIndex > scheduleEngineScriptIndex || scheduleEngineScriptIndex > appScriptIndex) throw new Error("Os motores de cálculo devem carregar antes do aplicativo.");
 if (!engine.includes("calculateDailyMetrics") || !engine.includes("parseIntervalMinutes")) throw new Error("Motor de cálculo incompleto.");
+if (!scheduleEngine.includes("buildForecast") || !scheduleEngine.includes("normalizeConfig")) throw new Error("Motor de escalas incompleto.");
 if (!manifest.icons.some((icon) => icon.sizes === "192x192") || !manifest.icons.some((icon) => icon.sizes === "512x512")) throw new Error("O manifesto precisa declarar ícones de 192px e 512px.");
 if (manifest.start_url !== "./" || manifest.scope !== "./") throw new Error("Manifesto PWA com escopo inesperado.");
-if (!sw.includes("addAll(APP_SHELL)") || !sw.includes("caches.match(request)")) throw new Error("Service Worker sem cache essencial/offline.");
-for (const required of ["exportBackup", "importBackup", "calculateDailyMetrics", "generateIndividualReport"]) {
+if (!sw.includes("addAll(APP_SHELL)") || !sw.includes("caches.match(request)") || !sw.includes("schedule-engine.js")) throw new Error("Service Worker sem cache essencial/offline.");
+for (const required of ["exportBackup", "importBackup", "calculateDailyMetrics", "generateIndividualReport", "renderShiftCalendar", "loadShiftPlans"]) {
   if (!js.includes("function " + required)) throw new Error("Função essencial ausente: " + required);
 }
 

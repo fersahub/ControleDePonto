@@ -32,11 +32,14 @@ jobs:
       - name: Validar JavaScript
         run: |
           node --check assets/js/time-engine.js
+          node --check assets/js/schedule-engine.js
           node --check assets/js/app.js
       - name: Teste estrutural do site
         run: node tests/smoke-test.js
       - name: Testes de cálculos e jornadas
         run: node tests/core-tests.js
+      - name: Testes dos ciclos de escala
+        run: node tests/schedule-tests.js
       - name: Instalar navegador para testes
         run: |
           mkdir -p /tmp/controle-ponto-tests
