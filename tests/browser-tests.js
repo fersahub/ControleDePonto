@@ -65,11 +65,22 @@ async function run() {
       navDisplay: getComputedStyle(document.querySelector(".side-nav")).display,
       navLinkDecoration: getComputedStyle(document.querySelector(".side-nav-link")).textDecorationLine,
       introDisplay: getComputedStyle(document.querySelector(".dashboard-intro")).display,
-      introBorder: getComputedStyle(document.querySelector(".dashboard-intro")).borderTopStyle
+      introBorder: getComputedStyle(document.querySelector(".dashboard-intro")).borderTopStyle,
+      navPosition: getComputedStyle(document.querySelector(".side-nav")).position,
+      headerPosition: getComputedStyle(document.querySelector(".topbar")).position
     }));
     check(desktopVisuals.navDisplay === "flex", "Navegação lateral realmente estilizada: " + JSON.stringify(desktopVisuals));
     check(desktopVisuals.navLinkDecoration === "none", "Links do menu sem sublinhado padrão");
     check(desktopVisuals.introDisplay === "grid" && desktopVisuals.introBorder === "solid", "Painel de resumo com grade e contorno visual");
+    check(desktopVisuals.navPosition === "fixed", "Menu lateral permanece fixo em telas de computador: " + JSON.stringify(desktopVisuals));
+    check(desktopVisuals.headerPosition === "sticky", "Cabeçalho permanece acessível durante a rolagem");
+    await page.evaluate(() => window.scrollTo(0, 500));
+    const fixedNavigation = await page.evaluate(() => ({
+      navTop: Math.round(document.querySelector(".side-nav").getBoundingClientRect().top),
+      headerTop: Math.round(document.querySelector(".topbar").getBoundingClientRect().top)
+    }));
+    check(fixedNavigation.navTop === 108 && fixedNavigation.headerTop === 0, "Menu e cabeçalho permanecem visíveis ao rolar: " + JSON.stringify(fixedNavigation));
+    await page.evaluate(() => window.scrollTo(0, 0));
     check(await page.locator(".dashboard-intro-actions a[href='#newRecordPanel']").count() === 1, "Ação rápida para novo lançamento");
     check(await page.locator(".dashboard-intro-actions a[href='#recordsPanel']").count() === 1, "Ação rápida para histórico");
     check(await page.locator(".stat-card").count() === 4, "Quatro indicadores originais preservados");
@@ -289,6 +300,8 @@ async function run() {
       document: document.documentElement.scrollWidth
     }));
     check(mobileWidths.document <= mobileWidths.viewport + 1, "Layout móvel sem rolagem horizontal na página: " + JSON.stringify(mobileWidths));
+    const mobileNavPosition = await page.evaluate(() => getComputedStyle(document.querySelector(".side-nav")).position);
+    check(mobileNavPosition === "sticky", "Navegação móvel permanece acessível abaixo do cabeçalho");
 
     // Verify that the service worker controls the app and can serve the shell offline.
     await page.evaluate(async () => {

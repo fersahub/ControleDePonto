@@ -1,9 +1,9 @@
-const CACHE_NAME = "meu-controle-jornada-v2-redesign-1-dashboard-4";
+const CACHE_NAME = "meu-controle-jornada-v2-redesign-1-dashboard-5";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./assets/css/style.css?v=dashboard-3",
-  "./assets/css/dashboard.css?v=dashboard-1",
+  "./assets/css/dashboard.css?v=dashboard-2",
   "./assets/js/time-engine.js?v=dashboard-3",
   "./assets/js/schedule-engine.js?v=dashboard-3",
   "./assets/js/app.js?v=dashboard-3",

@@ -354,3 +354,84 @@ button:focus-visible,.dashboard-action:focus-visible,.side-nav-link:focus-visibl
   main { width: 100%; }
   .site-footer { width: 100%; }
 }
+
+
+/* Navegação persistente durante a rolagem */
+@media (min-width: 1201px) {
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: rgba(243,246,251,.96);
+    backdrop-filter: blur(12px);
+  }
+  .side-nav {
+    position: fixed;
+    top: 108px;
+    bottom: 24px;
+    left: max(36px, calc((100vw - 1500px) / 2));
+    width: 228px;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 50;
+  }
+}
+@media (min-width: 761px) and (max-width: 1200px) {
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: rgba(243,246,251,.96);
+    backdrop-filter: blur(12px);
+  }
+  .side-nav {
+    position: fixed;
+    top: 108px;
+    bottom: 24px;
+    left: max(20px, calc((100vw - 1000px) / 2));
+    width: 205px;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 50;
+  }
+}
+@media (min-width: 541px) and (max-width: 760px) {
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: rgba(243,246,251,.97);
+    backdrop-filter: blur(12px);
+  }
+  .side-nav {
+    position: sticky;
+    top: 74px;
+    z-index: 50;
+    max-height: calc(100vh - 86px);
+    overflow-y: auto;
+    background: rgba(255,255,255,.97);
+  }
+}
+@media (max-width: 540px) {
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: rgba(243,246,251,.97);
+    backdrop-filter: blur(12px);
+  }
+  .side-nav {
+    position: sticky;
+    top: 68px;
+    z-index: 50;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+    background: rgba(255,255,255,.97);
+  }
+}
