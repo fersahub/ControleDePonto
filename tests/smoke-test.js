@@ -22,10 +22,13 @@ const assetRefs = [
   ...[...html.matchAll(/(?:src|href)=["']([^"']+)["']/g)].map((match) => match[1]),
   ...manifest.icons.map((icon) => icon.src)
 ].filter((ref) => !/^(https?:|#|mailto:|data:)/i.test(ref));
-const missingAssets = [...new Set(assetRefs)].filter((ref) => !fs.existsSync(path.join(root, ref.replace(/^\.\//, ""))));
+const missingAssets = [...new Set(assetRefs)].filter((ref) => {
+  const localPath = ref.split(/[?#]/)[0].replace(/^\.\//, "");
+  return !fs.existsSync(path.join(root, localPath));
+});
 if (missingAssets.length) throw new Error("Arquivos locais referenciados e ausentes: " + missingAssets.join(", "));
 
-const scriptRefs = [...html.matchAll(/<script\\s+src=["']([^"']+)["']/g)].map((match) => match[1].split(/[?#]/)[0]);
+const scriptRefs = [...html.matchAll(/<script\s+src=["']([^"']+)["']/g)].map((match) => match[1].split(/[?#]/)[0]);
 const engineScriptIndex = scriptRefs.indexOf("assets/js/time-engine.js");
 const scheduleEngineScriptIndex = scriptRefs.indexOf("assets/js/schedule-engine.js");
 const appScriptIndex = scriptRefs.indexOf("assets/js/app.js");
