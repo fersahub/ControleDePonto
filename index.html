@@ -64,24 +64,44 @@
         </div>
       </section>
 
+      <section class="dashboard-intro" aria-label="Visão geral do painel">
+        <div class="dashboard-intro-copy">
+          <span class="dashboard-kicker">PAINEL DE ACOMPANHAMENTO</span>
+          <h2>Resumo da sua jornada</h2>
+          <p>Uma visão rápida dos seus registros, horas extras e dias acompanhados.</p>
+        </div>
+        <div class="dashboard-intro-actions">
+          <a class="dashboard-action dashboard-action-primary" href="#newRecordPanel"><span aria-hidden="true">＋</span> Novo lançamento</a>
+          <a class="dashboard-action dashboard-action-secondary" href="#recordsPanel"><span aria-hidden="true">↗</span> Ver histórico</a>
+        </div>
+        <div class="dashboard-intro-foot">
+          <span class="dashboard-live-dot" aria-hidden="true"></span>
+          Indicadores atualizados automaticamente conforme seus lançamentos
+        </div>
+      </section>
+
+      <div class="dashboard-section-heading">
+        <div><span class="dashboard-section-eyebrow">ACOMPANHAMENTO</span><h2>Seus indicadores</h2></div>
+        <span class="dashboard-section-caption">Resumo do período selecionado</span>
+      </div>
       <section class="stats-grid" aria-label="Resumo dos lançamentos">
         <article class="stat-card">
-          <span class="stat-label">Lançamentos no período</span>
+          <span class="stat-icon" aria-hidden="true">▤</span><span class="stat-label">Lançamentos no período</span>
           <div class="stat-value" id="totalRecords">0</div>
           <span class="stat-note">Conforme filtro mensal</span>
         </article>
         <article class="stat-card">
-          <span class="stat-label">Horas extras no período</span>
+          <span class="stat-icon" aria-hidden="true">◷</span><span class="stat-label">Horas extras no período</span>
           <div class="stat-value stat-value-hours" id="totalOvertime">0h</div>
           <span class="stat-note">Acima da jornada diária configurada</span>
         </article>
         <article class="stat-card">
-          <span class="stat-label">Lançamentos de hoje</span>
+          <span class="stat-icon" aria-hidden="true">⌁</span><span class="stat-label">Lançamentos de hoje</span>
           <div class="stat-value" id="todayRecords">0</div>
           <span class="stat-note">Considerando a data inicial</span>
         </article>
         <article class="stat-card">
-          <span class="stat-label">Dias com registros</span>
+          <span class="stat-icon" aria-hidden="true">▦</span><span class="stat-label">Dias com registros</span>
           <div class="stat-value" id="vehicleCount">0</div>
           <span class="stat-note">Datas com lançamentos no filtro</span>
         </article>

@@ -60,6 +60,12 @@ async function run() {
     check(await page.title() === "Meu Controle de Jornada", "Título da versão pessoal");
     check(await page.locator("#schedulePreset").count() === 1, "Seção de jornada personalizada visível");
     check(await page.evaluate(() => !!window.TimeEngine), "Motor de cálculo carregado antes do app");
+    check(await page.locator(".dashboard-intro").count() === 1, "Resumo visual do dashboard presente");
+    check(await page.locator(".dashboard-intro-actions a[href='#newRecordPanel']").count() === 1, "Ação rápida para novo lançamento");
+    check(await page.locator(".dashboard-intro-actions a[href='#recordsPanel']").count() === 1, "Ação rápida para histórico");
+    check(await page.locator(".stat-card").count() === 4, "Quatro indicadores originais preservados");
+    check(await page.locator(".stat-card .stat-value").count() === 4, "Valores dos indicadores preservados");
+
     check(await page.locator(".side-nav").count() === 1, "Navegação lateral presente");
     for (const target of ["#overview", "#scheduleTitle", "#shiftPlannerPanel", "#newRecordPanel", "#recordsPanel", "#individualReportPanel", "#backupTitle"]) {
       check(await page.locator('.side-nav a[href="' + target + '"]').count() === 1, "Atalho de navegação válido: " + target);

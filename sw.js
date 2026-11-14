@@ -1,4 +1,4 @@
-const CACHE_NAME = "meu-controle-jornada-v2-redesign-1";
+const CACHE_NAME = "meu-controle-jornada-v2-redesign-1-dashboard-2";
 const APP_SHELL = [
   "./",
   "./index.html",
