@@ -12,11 +12,11 @@
   <link rel="apple-touch-icon" href="./assets/icons/icon-192.svg">
   <title>Meu Controle de Jornada</title>
   <link rel="stylesheet" href="assets/css/style.css?v=dashboard-3">
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=dashboard-2">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=dashboard-3">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script src="assets/js/time-engine.js?v=dashboard-3" defer></script>
   <script src="assets/js/schedule-engine.js?v=dashboard-3" defer></script>
-  <script src="assets/js/app.js?v=dashboard-3" defer></script>
+  <script src="assets/js/app.js?v=dashboard-4" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -106,6 +106,75 @@
           <div class="stat-value" id="vehicleCount">0</div>
           <span class="stat-note">Datas com lançamentos no filtro</span>
         </article>
+      </section>
+
+
+      <section class="dashboard-pulse-grid" aria-label="Resumo e evolução da jornada">
+        <article class="dashboard-panel dashboard-month-card">
+          <div class="dashboard-panel-heading">
+            <div><span class="dashboard-section-eyebrow">VISÃO DO MÊS</span><h2 id="dashboardMonthLabel">Competência atual</h2></div>
+            <span class="dashboard-panel-mark" aria-hidden="true">◷</span>
+          </div>
+          <div class="dashboard-month-metrics">
+            <div><span>Horas trabalhadas</span><strong id="dashboardWorkedTotal">0h 00min</strong></div>
+            <div><span>Média por dia</span><strong id="dashboardDailyAverage">—</strong></div>
+            <div><span>Dias ativos</span><strong id="dashboardActiveDays">0</strong></div>
+          </div>
+          <p class="dashboard-insight" id="dashboardInsight" aria-live="polite">Seus indicadores serão atualizados conforme os lançamentos.</p>
+          <small class="dashboard-scope-note">Considera o mês e a matrícula selecionados no calendário abaixo.</small>
+        </article>
+        <article class="dashboard-panel dashboard-week-card">
+          <div class="dashboard-panel-heading">
+            <div><span class="dashboard-section-eyebrow">RITMO RECENTE</span><h2>Últimos sete dias</h2></div>
+            <span class="dashboard-panel-mark dashboard-panel-mark-green" aria-hidden="true">↗</span>
+          </div>
+          <div class="dashboard-week-bars" id="dashboardWeekBars" aria-label="Horas trabalhadas nos últimos sete dias"></div>
+          <p class="dashboard-week-caption" id="dashboardWeekCaption">A evolução semanal aparecerá aqui.</p>
+        </article>
+      </section>
+
+      <section class="panel activity-panel" id="activityCalendarPanel" aria-labelledby="activityCalendarTitle">
+        <div class="panel-heading activity-panel-heading">
+          <div class="panel-title-wrap">
+            <span class="section-index">00C</span>
+            <div><h2 id="activityCalendarTitle">Calendário da jornada</h2><p>Consulte seus registros por dia e compare com a escala salva.</p></div>
+          </div>
+          <span class="planner-mode-label">Visão mensal</span>
+        </div>
+        <div class="activity-toolbar">
+          <div class="field"><label for="activityRegistration">Matrícula</label><select id="activityRegistration"><option value="all">Todas as matrículas</option></select></div>
+          <div class="field"><label for="activityMonth">Competência</label><input id="activityMonth" type="month"></div>
+        </div>
+        <div class="activity-layout">
+          <section class="activity-calendar-card" aria-label="Calendário mensal">
+            <div class="activity-month-nav">
+              <button class="activity-month-button" id="activityPrevMonth" type="button" aria-label="Mês anterior">‹</button>
+              <strong id="activityCalendarMonthLabel">Mês atual</strong>
+              <button class="activity-month-button" id="activityNextMonth" type="button" aria-label="Próximo mês">›</button>
+            </div>
+            <div class="activity-weekdays" aria-hidden="true"><span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span></div>
+            <div class="activity-calendar-grid" id="activityCalendarGrid" role="grid" aria-label="Dias do mês"></div>
+            <div class="activity-calendar-legend" aria-label="Legenda do calendário">
+              <span><i class="legend-dot legend-dot-recorded"></i> Com registros</span>
+              <span><i class="legend-dot legend-dot-planned"></i> Trabalho previsto</span>
+              <span><i class="legend-dot legend-dot-rest"></i> Descanso</span>
+              <span><i class="legend-dot legend-dot-missing"></i> Sem lançamento</span>
+            </div>
+          </section>
+          <section class="activity-day-card" aria-labelledby="activitySelectedDateLabel">
+            <div class="activity-day-heading">
+              <span class="dashboard-section-eyebrow">DETALHAMENTO DO DIA</span>
+              <h3 id="activitySelectedDateLabel">Selecione uma data</h3>
+            </div>
+            <div class="activity-day-summary">
+              <div><span>Trabalhadas</span><strong id="activityDayWorked">0h 00min</strong></div>
+              <div><span>Horas extras</span><strong id="activityDayOvertime">0h 00min</strong></div>
+              <div><span>Lançamentos</span><strong id="activityDayRecords">0</strong></div>
+            </div>
+            <div class="activity-timeline" id="activityTimeline" aria-live="polite"><div class="activity-empty">Selecione uma data no calendário para consultar a jornada.</div></div>
+          </section>
+        </div>
+        <p class="activity-calendar-note" id="activityCalendarNote">Selecione uma matrícula com escala salva para visualizar trabalho e descanso planejados. Sem escala, o calendário mostra apenas os lançamentos existentes.</p>
       </section>
 
       <section class="panel schedule-panel" aria-labelledby="scheduleTitle">

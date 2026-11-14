@@ -30,6 +30,10 @@
   const printButton = document.getElementById("printButton");
   const monthFilter = document.getElementById("monthFilter");
   const clearFilterButton = document.getElementById("clearFilterButton");
+  const activityRegistrationSelect = document.getElementById("activityRegistration");
+  const activityMonthInput = document.getElementById("activityMonth");
+  const activityCalendarGrid = document.getElementById("activityCalendarGrid");
+  let activitySelectedDate = "";
 
   let records = loadRecords();
 
@@ -250,6 +254,7 @@
     }
     renderShiftScheduleOptions();
     renderShiftCalendar();
+    renderDashboardExtras();
     feedbackElement.textContent = "Escala " + ScheduleEngine.typeLabel(config.type) + " salva para a matrícula " + config.registration + ". Os lançamentos e o cálculo atual de horas extras não foram alterados.";
   }
 
@@ -270,6 +275,7 @@
     }
     renderShiftScheduleOptions();
     renderShiftCalendar();
+    renderDashboardExtras();
     feedbackElement.textContent = "Escala excluída. Os lançamentos e demais jornadas foram mantidos.";
   }
 
@@ -732,6 +738,218 @@
     return selectedMonth ? sorted.filter((record) => monthKey(record.startDate) === selectedMonth) : sorted;
   }
 
+
+  function updateActivityRegistrationOptions() {
+    const previous = activityRegistrationSelect.value || "all";
+    const directory = new Map();
+    records.forEach((record) => {
+      const registration = normalizeRegistration(record.registration);
+      if (!registration) return;
+      const existing = directory.get(registration);
+      if (!existing || (!existing.fullName && record.fullName)) directory.set(registration, { registration, fullName: String(record.fullName || "").trim() });
+    });
+    Object.keys(shiftPlans).forEach((registration) => {
+      if (!directory.has(registration)) directory.set(registration, { registration, fullName: "" });
+    });
+    activityRegistrationSelect.replaceChildren();
+    const all = document.createElement("option");
+    all.value = "all"; all.textContent = "Todas as matrículas"; activityRegistrationSelect.append(all);
+    [...directory.values()].sort((a,b)=>(a.fullName||a.registration).localeCompare(b.fullName||b.registration,"pt-BR")).forEach((employee) => {
+      const option = document.createElement("option");
+      option.value = employee.registration;
+      option.textContent = employee.fullName ? employee.fullName + " · " + employee.registration : "Matrícula " + employee.registration;
+      activityRegistrationSelect.append(option);
+    });
+    activityRegistrationSelect.value = directory.has(previous) ? previous : "all";
+  }
+
+  function activityMonthInfo() {
+    const value = activityMonthInput.value || localDateString().slice(0,7);
+    const match = value.match(/^(\d{4})-(\d{2})$/);
+    if (!match) throw new Error("Selecione uma competência válida.");
+    const year = Number(match[1]), month = Number(match[2]);
+    const first = new Date(year, month-1, 1, 12);
+    return { value, year, month, first, days: new Date(year,month,0).getDate(), leading: first.getDay(), startDate: value + "-01" };
+  }
+
+  function activityDateRecords(date, registration) {
+    return records.filter((record)=>record.startDate===date&&(registration==="all"||normalizeRegistration(record.registration)===registration));
+  }
+
+  function appendActivityNode(parent, tag, className, text) {
+    const node=document.createElement(tag);
+    if(className) node.className=className;
+    if(text!==undefined) node.textContent=text;
+    parent.append(node);
+    return node;
+  }
+
+  function renderDashboardSummary(dailyMetrics, monthInfo, registration) {
+    const monthRecords=records.filter((record)=>monthKey(record.startDate)===monthInfo.value&&(registration==="all"||normalizeRegistration(record.registration)===registration));
+    let workedTotal=0,overtimeTotal=0;
+    const activeDays=new Set();
+    monthRecords.forEach((record)=>{
+      const metrics=dailyMetrics.get(record)||getWorkMetrics(record);
+      if(metrics.error) return;
+      workedTotal+=metrics.workedMinutes;
+      overtimeTotal+=metrics.overtimeMinutes;
+      if(metrics.workedMinutes>0) activeDays.add(record.startDate);
+    });
+    document.getElementById("dashboardMonthLabel").textContent=formatMonth(monthInfo.value);
+    document.getElementById("dashboardWorkedTotal").textContent=formatMinutes(workedTotal);
+    document.getElementById("dashboardDailyAverage").textContent=activeDays.size?formatMinutes(Math.round(workedTotal/activeDays.size)):"—";
+    document.getElementById("dashboardActiveDays").textContent=String(activeDays.size);
+    const insight=document.getElementById("dashboardInsight");
+    if(!monthRecords.length) insight.textContent="Ainda não há lançamentos nesta competência. Assim que você registrar suas jornadas, o resumo será atualizado.";
+    else if(!activeDays.size) insight.textContent="Há lançamentos neste período, mas nenhum deles representa horas de trabalho contabilizadas.";
+    else if(overtimeTotal>0){
+      const extraRecords=monthRecords.filter((record)=>{const metrics=dailyMetrics.get(record);return metrics&&!metrics.error&&metrics.overtimeMinutes>0;}).length;
+      insight.textContent="Foram acumuladas "+formatMinutes(overtimeTotal)+" de horas extras em "+extraRecords+" lançamento(s) com excedente.";
+    } else insight.textContent="Você registrou "+formatMinutes(workedTotal)+" em "+activeDays.size+(activeDays.size===1?" dia ativo.":" dias ativos.")+" Nenhum excedente foi apurado até agora.";
+
+    const bars=document.getElementById("dashboardWeekBars");
+    bars.replaceChildren();
+    const today=new Date(), maxMinutes=720;
+    for(let offset=6;offset>=0;offset-=1){
+      const date=new Date(today.getFullYear(),today.getMonth(),today.getDate()-offset,12);
+      const key=localDateString(date);
+      let regular=0,overtime=0,worked=0;
+      records.filter((record)=>record.startDate===key&&(registration==="all"||normalizeRegistration(record.registration)===registration)).forEach((record)=>{
+        const metrics=dailyMetrics.get(record)||getWorkMetrics(record);
+        if(metrics.error)return;
+        regular+=metrics.regularMinutes;overtime+=metrics.overtimeMinutes;worked+=metrics.workedMinutes;
+      });
+      const row=appendActivityNode(bars,"div","dashboard-week-row");
+      const dateLabel=appendActivityNode(row,"span","dashboard-week-date",new Intl.DateTimeFormat("pt-BR",{weekday:"short"}).format(date).replace(".",""));
+      dateLabel.title=formatDate(key);
+      const track=appendActivityNode(row,"div","dashboard-week-track");
+      const regularBar=appendActivityNode(track,"span","dashboard-week-regular");
+      const extraBar=appendActivityNode(track,"span","dashboard-week-extra");
+      const regularPercent=Math.min(100,regular/maxMinutes*100);
+      regularBar.style.width=regularPercent+"%";
+      extraBar.style.width=Math.min(100-regularPercent,overtime/maxMinutes*100)+"%";
+      track.setAttribute("aria-label",formatDate(key)+": "+formatMinutes(worked)+" trabalhadas, "+formatMinutes(overtime)+" extras");
+      appendActivityNode(row,"strong","dashboard-week-value",worked?formatMinutes(worked).replace("min",""):"—");
+    }
+    document.getElementById("dashboardWeekCaption").textContent="Horas líquidas por dia · azul representa horas normais e verde representa excedentes.";
+  }
+
+  function renderActivityTimeline(date, registration, dailyMetrics, forecastDay) {
+    const dayRecords=activityDateRecords(date,registration).sort((a,b)=>String(a.startTime||"").localeCompare(String(b.startTime||"")));
+    const titleDate=dateObject(date);
+    document.getElementById("activitySelectedDateLabel").textContent=titleDate?formatLongDate(titleDate):formatDate(date);
+    let worked=0,overtime=0;
+    dayRecords.forEach((record)=>{
+      const metrics=dailyMetrics.get(record)||getWorkMetrics(record);
+      if(metrics.error)return;
+      worked+=metrics.workedMinutes;overtime+=metrics.overtimeMinutes;
+    });
+    document.getElementById("activityDayWorked").textContent=formatMinutes(worked);
+    document.getElementById("activityDayOvertime").textContent=formatMinutes(overtime);
+    document.getElementById("activityDayRecords").textContent=String(dayRecords.length);
+    const timeline=document.getElementById("activityTimeline");
+    timeline.replaceChildren();
+    if(!dayRecords.length){
+      appendActivityNode(timeline,"div","activity-empty","Nenhum lançamento cadastrado para esta data.");
+      if(forecastDay&&forecastDay.kind==="work") appendActivityNode(timeline,"p","activity-neutral-note","Há um turno de trabalho planejado para este dia, mas não existe lançamento associado. Isso, por si só, não caracteriza falta.");
+      else if(forecastDay&&forecastDay.kind==="rest") appendActivityNode(timeline,"p","activity-neutral-note","Esta data está marcada como descanso na escala selecionada.");
+      return;
+    }
+    dayRecords.forEach((record)=>{
+      const entry=appendActivityNode(timeline,"article","activity-timeline-entry");
+      const time=record.serviceType==="Folga"?"—":(record.startTime||"—")+(record.endTime?" – "+record.endTime:"");
+      appendActivityNode(entry,"div","activity-event-time",time);
+      appendActivityNode(entry,"span","activity-event-marker","");
+      const content=appendActivityNode(entry,"div","activity-event-content");
+      const heading=appendActivityNode(content,"div","activity-event-heading");
+      const serviceClass=({"Plantão":"plantao","Viagem":"viagem","Intervalo":"intervalo","Folga":"folga"})[record.serviceType]||"";
+      appendActivityNode(heading,"span","activity-service-pill "+serviceClass,record.serviceType||"Serviço");
+      if(registration==="all") appendActivityNode(heading,"strong","activity-event-person",record.fullName||"Colaborador");
+      let detail="";
+      if(record.serviceType==="Folga") detail="Dia de folga registrado · nenhuma hora contabilizada.";
+      else if(record.serviceType==="Intervalo") detail="Intervalo informado · não contabilizado como trabalho.";
+      else {
+        const metrics=dailyMetrics.get(record)||getWorkMetrics(record);
+        detail=metrics.error?"Não foi possível calcular este lançamento.":"Trabalhado "+formatMinutes(metrics.workedMinutes)+" · Extras "+formatMinutes(metrics.overtimeMinutes);
+        if(record.interval)detail+=" · Intervalo: "+record.interval;
+        if(record.endDate&&record.endDate!==record.startDate)detail+=" · término em "+formatDate(record.endDate);
+      }
+      if(record.serviceType==="Viagem"){
+        detail+=" · "+(record.origin||"Origem não informada")+" → "+(record.destination||"Destino não informado");
+        if(record.vehicleOrder||record.plate)detail+=" · "+[record.vehicleOrder,record.plate].filter(Boolean).join(" / ");
+      }
+      appendActivityNode(content,"p","activity-event-detail",registration==="all"?"Matrícula "+(record.registration||"—")+" · "+detail:detail);
+    });
+  }
+
+  function renderActivityCalendar(dailyMetrics,monthInfo,registration) {
+    const grid=activityCalendarGrid;
+    grid.replaceChildren();
+    document.getElementById("activityCalendarMonthLabel").textContent=formatMonth(monthInfo.value);
+    if(!activitySelectedDate||monthKey(activitySelectedDate)!==monthInfo.value)activitySelectedDate=monthInfo.value+"-01";
+    const forecastByDate=new Map();
+    let activePlan=null,forecastError="";
+    if(registration!=="all"&&shiftPlans[registration]){
+      activePlan=shiftPlans[registration];
+      try{
+        const counts={};
+        records.forEach((record)=>{
+          if(normalizeRegistration(record.registration)!==registration||!["Plantão","Viagem"].includes(record.serviceType))return;
+          counts[record.startDate]=(counts[record.startDate]||0)+1;
+        });
+        ScheduleEngine.buildForecast(activePlan,monthInfo.startDate,monthInfo.days,counts).forEach((day)=>forecastByDate.set(day.date,day));
+      }catch(error){forecastError=error.message||"Não foi possível carregar a escala.";}
+    }
+    for(let i=0;i<monthInfo.leading;i+=1)appendActivityNode(grid,"span","activity-calendar-blank");
+    for(let dayNumber=1;dayNumber<=monthInfo.days;dayNumber+=1){
+      const date=monthInfo.value+"-"+String(dayNumber).padStart(2,"0");
+      const dayRecords=activityDateRecords(date,registration);
+      const forecastDay=forecastByDate.get(date);
+      const today=date===localDateString();
+      let statusLabel="",statusClass="";
+      if(dayRecords.length){statusLabel=dayRecords.length+(dayRecords.length===1?" registro":" registros");statusClass="activity-day--recorded";}
+      else if(forecastDay){
+        if(forecastDay.kind==="rest"){statusLabel="Descanso";statusClass="activity-day--rest";}
+        else if(forecastDay.kind==="continuation"){statusLabel="Continuação";statusClass="activity-day--continuation";}
+        else if(forecastDay.kind==="work"){statusLabel=forecastDay.statusKey==="missing"?"Sem lançamento":forecastDay.statusKey==="today"?"Hoje · previsto":"Previsto";statusClass=forecastDay.statusKey==="missing"?"activity-day--missing":"activity-day--planned";}
+        else{statusLabel="Não iniciado";statusClass="activity-day--neutral";}
+      } else {statusLabel=today?"Hoje":"";statusClass="activity-day--neutral";}
+      const button=appendActivityNode(grid,"button","activity-day "+statusClass+(date===activitySelectedDate?" is-selected":"")+(today?" is-today":""));
+      button.type="button";button.dataset.date=date;button.setAttribute("role","gridcell");
+      button.setAttribute("aria-pressed",String(date===activitySelectedDate));
+      button.setAttribute("aria-label",formatDate(date)+(statusLabel?" · "+statusLabel:""));
+      appendActivityNode(button,"span","activity-day-number",String(dayNumber));
+      appendActivityNode(button,"small","activity-day-status",statusLabel||" ");
+    }
+    while(grid.children.length%7!==0)appendActivityNode(grid,"span","activity-calendar-blank");
+    const note=document.getElementById("activityCalendarNote");
+    if(forecastError)note.textContent="Não foi possível montar a escala: "+forecastError;
+    else if(activePlan)note.textContent="Escala "+ScheduleEngine.typeLabel(activePlan.type)+" da matrícula "+registration+" integrada ao calendário. “Sem lançamento” é apenas uma indicação de registro ausente, não uma confirmação de falta.";
+    else if(registration==="all")note.textContent="Visão consolidada dos registros. Selecione uma matrícula com escala salva para visualizar os dias de trabalho e descanso planejados.";
+    else note.textContent="Não há escala salva para esta matrícula. O calendário mostra apenas os lançamentos existentes; dias vazios não indicam falta.";
+    renderActivityTimeline(activitySelectedDate,registration,dailyMetrics,forecastByDate.get(activitySelectedDate));
+  }
+
+  function renderDashboardExtras(sourceMetrics) {
+    if(!activityCalendarGrid||!activityMonthInput)return;
+    updateActivityRegistrationOptions();
+    if(!activityMonthInput.value)activityMonthInput.value=localDateString().slice(0,7);
+    let monthInfo;
+    try{monthInfo=activityMonthInfo();}catch(error){return;}
+    const registration=activityRegistrationSelect.value||"all";
+    const dailyMetrics=sourceMetrics||calculateDailyMetrics(records);
+    renderDashboardSummary(dailyMetrics,monthInfo,registration);
+    renderActivityCalendar(dailyMetrics,monthInfo,registration);
+  }
+
+  function shiftActivityMonth(offset) {
+    const info=activityMonthInfo();
+    const next=new Date(info.year,info.month-1+offset,1,12);
+    activityMonthInput.value=localDateString(next).slice(0,7);
+    activitySelectedDate=activityMonthInput.value+"-01";
+    renderDashboardExtras();
+  }
+
   function updateMonthFilterOptions() {
     const selected = monthFilter.value;
     const months = [...new Set(records.map((record) => monthKey(record.startDate)).filter(Boolean))].sort().reverse();
@@ -854,6 +1072,7 @@
       document.getElementById("lastUpdated").textContent = "Nenhum registro salvo";
     }
     renderShiftCalendar();
+    renderDashboardExtras(dailyMetrics);
   }
 
   function csvEscape(value) {
@@ -1505,6 +1724,19 @@
   });
 
   monthFilter.addEventListener("change", renderRecords);
+  activityRegistrationSelect.addEventListener("change", () => renderDashboardExtras());
+  activityMonthInput.addEventListener("change", () => {
+    activitySelectedDate = activityMonthInput.value ? activityMonthInput.value + "-01" : localDateString();
+    renderDashboardExtras();
+  });
+  activityCalendarGrid.addEventListener("click", (event) => {
+    const dayButton = event.target.closest("button[data-date]");
+    if (!dayButton) return;
+    activitySelectedDate = dayButton.dataset.date;
+    renderDashboardExtras();
+  });
+  document.getElementById("activityPrevMonth").addEventListener("click", () => shiftActivityMonth(-1));
+  document.getElementById("activityNextMonth").addEventListener("click", () => shiftActivityMonth(1));
   individualMonth.addEventListener("change", () => { updateIndividualEmployeeOptions(); individualReportOutput.classList.add("is-hidden"); });
   individualEmployee.addEventListener("change", () => individualReportOutput.classList.add("is-hidden"));
   generateIndividualReportButton.addEventListener("click", generateIndividualReport);
@@ -1525,6 +1757,8 @@
   endDateInput.value = localDateString();
   document.getElementById("shiftAnchorDate").value = localDateString();
   document.getElementById("planCalendarStartDate").value = localDateString();
+  activityMonthInput.value = localDateString().slice(0,7);
+  activitySelectedDate = localDateString();
   refreshShiftPlannerTypeFields();
   renderShiftScheduleOptions();
   toggleRouteFields();

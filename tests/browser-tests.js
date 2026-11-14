@@ -61,6 +61,9 @@ async function run() {
     check(await page.locator("#schedulePreset").count() === 1, "Seção de jornada personalizada visível");
     check(await page.evaluate(() => !!window.TimeEngine), "Motor de cálculo carregado antes do app");
     check(await page.locator(".dashboard-intro").count() === 1, "Resumo visual do dashboard presente");
+    check(await page.locator("#activityCalendarPanel").count() === 1, "Calendário mensal da jornada presente");
+    check(await page.locator("#activityTimeline").count() === 1, "Linha do tempo diária presente");
+    check(await page.locator("#dashboardWeekBars .dashboard-week-row").count() === 7, "Resumo visual dos últimos sete dias");
     const desktopVisuals = await page.evaluate(() => ({
       navDisplay: getComputedStyle(document.querySelector(".side-nav")).display,
       navLinkDecoration: getComputedStyle(document.querySelector(".side-nav-link")).textDecorationLine,
@@ -125,6 +128,10 @@ async function run() {
       kinds: [...document.querySelectorAll("#shiftCalendarBody tr")].slice(0, 7).map((row) => row.dataset.kind)
     }));
     check(sixOnePlanner.saved.type === "6x1", "Planejador salva escala separada por matrícula");
+    await page.locator("#activityRegistration").selectOption("PLAN-001");
+    await page.locator("#activityMonth").fill("2026-11");
+    check(await page.locator("#activityCalendarGrid button[data-date='2026-11-10']").count() === 1, "Calendário inclui o dia planejado da escala salva");
+    check((await page.locator("#activityCalendarNote").textContent()).includes("integrada ao calendário"), "Calendário informa integração da escala");
     check(JSON.stringify(sixOnePlanner.kinds) === JSON.stringify(["work","work","work","work","work","work","rest"]), "Calendário projeta o ciclo 6x1");
 
     await page.locator("#shiftScheduleRegistration").fill("PLAN-12");
@@ -174,6 +181,12 @@ async function run() {
     let records = await page.evaluate(() => JSON.parse(localStorage.getItem("controleDePonto.registros.v1") || "[]"));
     check(records.length === 1, "Plantão salvo");
     check(records[0].interval === "01:00", "Intervalo descontado armazenado");
+    await page.locator("#activityRegistration").selectOption("TESTE-001");
+    await page.locator("#activityMonth").fill("2026-11");
+    await page.locator("#activityCalendarGrid button[data-date='2026-11-12']").click();
+    check(await page.locator(".activity-timeline-entry").count() === 1, "Linha do tempo mostra o lançamento do dia selecionado");
+    check((await page.locator("#activityDayWorked").textContent()).includes("8h 00min"), "Resumo diário usa a jornada líquida calculada");
+    check((await page.locator("#activityDayRecords").textContent()) === "1", "Resumo diário conta os lançamentos da matrícula selecionada");
 
     // Duplicate periods require explicit confirmation; cancelling must preserve the unsaved form.
     await fillIdentity();

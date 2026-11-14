@@ -38,7 +38,7 @@ if (!scheduleEngine.includes("buildForecast") || !scheduleEngine.includes("norma
 if (!manifest.icons.some((icon) => icon.sizes === "192x192") || !manifest.icons.some((icon) => icon.sizes === "512x512")) throw new Error("O manifesto precisa declarar ícones de 192px e 512px.");
 if (manifest.start_url !== "./" || manifest.scope !== "./") throw new Error("Manifesto PWA com escopo inesperado.");
 if (!sw.includes("addAll(APP_SHELL)") || !sw.includes("caches.match(request)") || !sw.includes("schedule-engine.js")) throw new Error("Service Worker sem cache essencial/offline.");
-for (const required of ["exportBackup", "importBackup", "calculateDailyMetrics", "generateIndividualReport", "renderShiftCalendar", "loadShiftPlans"]) {
+for (const required of ["exportBackup", "importBackup", "calculateDailyMetrics", "generateIndividualReport", "renderShiftCalendar", "loadShiftPlans", "renderDashboardExtras", "renderActivityCalendar", "renderActivityTimeline"]) {
   if (!js.includes("function " + required)) throw new Error("Função essencial ausente: " + required);
 }
 

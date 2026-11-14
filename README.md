@@ -20,6 +20,9 @@ Aplicativo pessoal, estático e instalável para registrar jornadas, intervalos,
 - Filtro automático por coluna na planilha, incluindo Competência (mês).
 - Exportação alternativa em CSV.
 - Backup completo em JSON, incluindo lançamentos e jornadas personalizadas, com restauração validada e confirmação antes de substituir os dados.
+- Dashboard com resumo mensal de horas trabalhadas, média diária, dias ativos e evolução dos últimos sete dias.
+- Calendário mensal interativo por matrícula, com visualização da escala salva (trabalho previsto, descanso, continuação e dias sem lançamento) e distinção entre planejamento e registros.
+- Linha do tempo diária com detalhamento de plantões, viagens, intervalos e folgas, incluindo horas trabalhadas e extras apuradas pelos motores existentes.
 - Aplicativo preparado para uso offline após a primeira visita, por meio de Service Worker e cache dos arquivos essenciais.
 
 ## Critério de horas extras
