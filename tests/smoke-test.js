@@ -50,9 +50,10 @@ console.log("Smoke test aprovado: IDs, arquivos locais, manifesto PWA, cache off
 for (const required of ["setupControleDePonto", "doPost", "getAll_", "saveRecord_", "importRecords_", "importSchedules_", "importShiftPlans_", "validateApiKey_", "withWriteLock_"]) {
   if (!sheetsBackend.includes("function " + required)) throw new Error("Função essencial do backend ausente: " + required);
 }
-for (const required of ["function request", "function configure", "postMessage", "sessionStorage"]) {
+for (const required of ["function request", "function configure", "addEventListener(\"message\"", "sessionStorage"]) {
   if (!sheetsClient.includes(required)) throw new Error("Cliente Google Sheets incompleto: " + required);
 }
+if (!sheetsBackend.includes("window.parent.postMessage")) throw new Error("Backend não envia a resposta pelo canal de comunicação esperado.");
 for (const required of ["cloudEndpoint", "cloudAccessCode", "cloudBackupFileInput", "importCloudBackupButton", "syncLocalDataButton"]) {
   if (!ids.includes(required)) throw new Error("Controle da integração Google Sheets ausente: " + required);
 }
