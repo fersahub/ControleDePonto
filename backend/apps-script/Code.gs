@@ -126,6 +126,7 @@ function doPost(e) {
 
     validateOrigin_(origin);
     validateApiKey_(request.apiKey);
+    enforceRateLimit_();
 
     const result = dispatch_(request);
     return bridgeResponse_(requestId, { ok: true, data: result }, origin);
@@ -251,7 +252,7 @@ function saveSchedule_(registration, dailyTargetMinutes) {
   return withWriteLock_(function() {
     const sheet = getSpreadsheet_().getSheetByName(CP.sheets.schedules);
     const value = { registration: key, dailyTargetMinutes: minutes, updatedAt: new Date().toISOString() };
-    const row = [key, minutes, value.updatedAt, JSON.stringify(value)];
+    const row = [safeSheetText_(key), minutes, value.updatedAt, JSON.stringify(value)];
     upsertRow_(sheet, key, row);
     return { saved: true, registration: key };
   });
@@ -274,7 +275,7 @@ function saveShiftPlan_(config) {
   if (!key) throw apiError_("INVALID_REGISTRATION", "Matrícula não informada.");
   const normalized = Object.assign({}, config, { registration: key, updatedAt: new Date().toISOString() });
   const row = [
-    key, normalized.type || "", normalized.anchorDate || "", normalized.startTime || "",
+    safeSheetText_(key), safeSheetText_(normalized.type || ""), safeSheetText_(normalized.anchorDate || ""), safeSheetText_(normalized.startTime || ""),
     Number(normalized.durationMinutes) || 0, Number(normalized.intervalMinutes) || 0,
     Number(normalized.workDays) || 0, Number(normalized.restDays) || 0,
     normalized.updatedAt, JSON.stringify(normalized)
@@ -369,7 +370,7 @@ function importShiftPlans_(source) {
       if (!key || !entry[1] || typeof entry[1] !== "object") return;
       const config = Object.assign({}, entry[1], { registration: key, updatedAt: new Date().toISOString() });
       const row = [
-        key, config.type || "", config.anchorDate || "", config.startTime || "",
+        safeSheetText_(key), safeSheetText_(config.type || ""), safeSheetText_(config.anchorDate || ""), safeSheetText_(config.startTime || ""),
         Number(config.durationMinutes) || 0, Number(config.intervalMinutes) || 0,
         Number(config.workDays) || 0, Number(config.restDays) || 0,
         config.updatedAt, JSON.stringify(config)
@@ -383,16 +384,18 @@ function importShiftPlans_(source) {
 
 function validateRecord_(record) {
   if (!record || typeof record !== "object" || Array.isArray(record)) throw apiError_("INVALID_RECORD", "Lançamento inválido.");
-  if (!String(record.id || "").trim()) throw apiError_("INVALID_RECORD", "Lançamento sem identificador.");
-  if (!normalizeRegistration_(record.registration)) throw apiError_("INVALID_RECORD", "Lançamento sem matrícula.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(record.startDate || ""))) throw apiError_("INVALID_RECORD", "Data inicial inválida.");
+  if (!String(record.id || "").trim() || String(record.id).length > 100) throw apiError_("INVALID_RECORD", "Lançamento sem identificador válido.");
+  if (!normalizeRegistration_(record.registration) || String(record.registration).length > 30) throw apiError_("INVALID_RECORD", "Lançamento sem matrícula válida.");
+  if (!isValidIsoDate_(record.startDate)) throw apiError_("INVALID_RECORD", "Data inicial inválida.");
+  if (String(record.fullName || "").length > 120) throw apiError_("INVALID_RECORD", "Nome do colaborador ultrapassa o limite permitido.");
   const allowed = ["Plantão", "Viagem", "Intervalo", "Folga"];
   if (!allowed.includes(String(record.serviceType || ""))) throw apiError_("INVALID_RECORD", "Tipo de serviço inválido.");
   if (["Plantão", "Viagem"].includes(record.serviceType)) {
-    if (!/^\d{2}:\d{2}$/.test(String(record.startTime || "")) ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(String(record.endDate || "")) ||
-        !/^\d{2}:\d{2}$/.test(String(record.endTime || ""))) {
-      throw apiError_("INVALID_RECORD", "Horários do lançamento inválidos.");
+    if (!isValidClock_(record.startTime) || !isValidIsoDate_(record.endDate) || !isValidClock_(record.endTime)) {
+      throw apiError_("INVALID_RECORD", "Datas ou horários do lançamento inválidos.");
+    }
+    if (dateTimeNumber_(record.endDate, record.endTime) <= dateTimeNumber_(record.startDate, record.startTime)) {
+      throw apiError_("INVALID_RECORD", "O término precisa ser posterior ao início.");
     }
     if (record.serviceType === "Viagem" &&
         (!String(record.vehicleOrder || "").trim() || !String(record.plate || "").trim() ||
@@ -402,15 +405,31 @@ function validateRecord_(record) {
   }
 }
 
+function isValidIsoDate_(value) {
+  const text = String(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const date = new Date(text + "T00:00:00Z");
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === text;
+}
+
+function isValidClock_(value) {
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(value || ""));
+}
+
 function recordToRow_(record) {
   return [
-    String(record.id), normalizeRegistration_(record.registration), String(record.fullName || ""),
-    String(record.startDate || ""), String(record.startTime || ""), String(record.interval || ""),
-    String(record.endDate || ""), String(record.endTime || ""), String(record.vehicleOrder || ""),
-    String(record.plate || ""), String(record.serviceType || ""), String(record.origin || ""),
-    String(record.destination || ""), String(record.createdAt || ""), String(record.updatedAt || ""),
+    safeSheetText_(record.id), safeSheetText_(normalizeRegistration_(record.registration)), safeSheetText_(record.fullName || ""),
+    safeSheetText_(record.startDate || ""), safeSheetText_(record.startTime || ""), safeSheetText_(record.interval || ""),
+    safeSheetText_(record.endDate || ""), safeSheetText_(record.endTime || ""), safeSheetText_(record.vehicleOrder || ""),
+    safeSheetText_(record.plate || ""), safeSheetText_(record.serviceType || ""), safeSheetText_(record.origin || ""),
+    safeSheetText_(record.destination || ""), safeSheetText_(record.createdAt || ""), safeSheetText_(record.updatedAt || ""),
     JSON.stringify(record)
   ];
+}
+
+function safeSheetText_(value) {
+  const text = String(value === undefined || value === null ? "" : value);
+  return /^[=+@-]/.test(text) ? "'" + text : text;
 }
 
 function readJsonRows_(sheet, jsonColumn) {
@@ -516,6 +535,15 @@ function withWriteLock_(callback) {
   lock.waitLock(20000);
   try { return callback(); }
   finally { lock.releaseLock(); }
+}
+
+
+function enforceRateLimit_() {
+  const cache = CacheService.getScriptCache();
+  const key = "CP_REQUESTS_PER_MINUTE";
+  const count = Number(cache.get(key) || 0) + 1;
+  if (count > 180) throw apiError_("RATE_LIMIT", "Muitas solicitações em sequência. Aguarde um minuto e tente novamente.");
+  cache.put(key, String(count), 60);
 }
 
 function validateApiKey_(candidate) {
