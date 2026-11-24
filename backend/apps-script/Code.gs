@@ -480,7 +480,7 @@ function importShiftPlans_(source, admin) {
 
 function ownerForRegistration_(registration) {
   const key = normalizeRegistration_(registration);
-  const user = readUsers_().find(u => u.role === "employee" && u.active && u.registration === key);
+  const user = readUsers_().find(u => u.role === "employee" && u.registration === key);
   return user ? user.id : "";
 }
 
