@@ -107,6 +107,7 @@ function dispatch_(request) {
   if (action === "logout") return logout_(request.sessionToken);
   const session = getSession_(request.sessionToken);
   const user = session.user;
+  if (user.mustChange && action !== "changePassword") throw apiError_("PASSWORD_CHANGE_REQUIRED", "Altere sua senha temporária antes de continuar.");
   switch (action) {
     case "ping": return ping_(user);
     case "getAll": return getAll_(user);
@@ -227,7 +228,9 @@ function updateUserPassword_(userId, password, mustChange) {
   const sheet = getSheet_(CP.sheets.users);
   const row = findRowByKey_(sheet, 1, userId);
   if (!row) throw apiError_("USER_NOT_FOUND", "Usuário não encontrado.");
-  sheet.getRange(row, 6, 1, 4).setValues([[salt, hash, "SIM", mustChange ? "SIM" : "NAO"]]);
+  sheet.getRange(row, 6).setValue(salt);
+  sheet.getRange(row, 7).setValue(hash);
+  sheet.getRange(row, 9).setValue(mustChange ? "SIM" : "NAO");
   revokeUserSessions_(userId);
 }
 
@@ -314,6 +317,7 @@ function saveRecord_(record, force, user) {
     const all = readJsonRows_(sheet, 16);
     const existing = all.find(item => String(item.id) === String(normalized.id));
     if (existing && user.role !== "admin" && String(existing.ownerId || "") !== user.id) throw apiError_("FORBIDDEN", "Você não pode alterar o lançamento de outra pessoa.");
+    if (existing && user.role === "admin" && !record.ownerId) normalized.ownerId = existing.ownerId || user.id;
     const sameOwner = all.filter(item => String(item.ownerId || "") === String(normalized.ownerId));
     const duplicate = sameOwner.find(item => String(item.id) !== String(normalized.id) && recordSignature_(item) === recordSignature_(normalized));
     if (duplicate) throw apiError_("DUPLICATE_RECORD", "Este lançamento já existe no banco central.");
