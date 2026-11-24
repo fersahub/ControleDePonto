@@ -52,11 +52,13 @@ async function run() {
   try {
     const context = await browser.newContext({ acceptDownloads: true });
     const page = await context.newPage();
+    await page.addInitScript(() => { window.__CP_TEST_MODE = true; });
     const pageErrors = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
     await page.goto(url, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#timeForm");
+    await page.waitForSelector("body.auth-ready");
     check(await page.title() === "Meu Controle de Jornada", "Título da versão pessoal");
     check(await page.locator("#schedulePreset").count() === 1, "Seção de jornada personalizada visível");
     check(await page.evaluate(() => !!window.TimeEngine), "Motor de cálculo carregado antes do app");
