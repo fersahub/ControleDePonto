@@ -98,6 +98,8 @@ async function run() {
     }
 
 
+    await page.locator(".side-nav a[href='#scheduleTitle']").click();
+
     // Custom daily target and a shift with deducted break.
     await page.locator("#scheduleRegistration").fill("TESTE-001");
     await page.locator("#schedulePreset").selectOption("custom");
@@ -116,6 +118,8 @@ async function run() {
     }));
     check(scheduleResult.saved["TESTE-001"] === 480, "Jornada personalizada salva: " + JSON.stringify(scheduleResult));
 
+    await page.locator(".side-nav a[href='#shiftPlannerPanel']").click();
+
     // Planner saves and projects independent work/rest cycles.
     await page.locator("#shiftScheduleRegistration").fill("PLAN-001");
     await page.locator("#shiftScheduleType").selectOption("6x1");
@@ -130,6 +134,7 @@ async function run() {
       kinds: [...document.querySelectorAll("#shiftCalendarBody tr")].slice(0, 7).map((row) => row.dataset.kind)
     }));
     check(sixOnePlanner.saved.type === "6x1", "Planejador salva escala separada por matrícula");
+    await page.locator(".side-nav a[href='#overview']").click();
     await page.locator("#activityRegistration").selectOption("PLAN-001");
     await page.locator("#activityMonth").fill("2026-11");
     check(await page.locator("#activityCalendarGrid button[data-date='2026-11-10']").count() === 1, "Calendário inclui o dia planejado da escala salva");
@@ -149,6 +154,8 @@ async function run() {
     }));
     check(twelvePlanner.saved.durationMinutes === 720, "12x36 salva duração de 12 horas");
     check(JSON.stringify(twelvePlanner.kinds) === JSON.stringify(["work","continuation","work","continuation","work"]), "Calendário identifica turnos noturnos e continuações no 12x36");
+
+    await page.locator(".side-nav a[href='#newRecordPanel']").click();
 
     // Required-field validation must stop an incomplete record.
     await page.locator("#serviceType").selectOption("Plantão");
@@ -183,12 +190,15 @@ async function run() {
     let records = await page.evaluate(() => JSON.parse(localStorage.getItem("controleDePonto.registros.v1") || "[]"));
     check(records.length === 1, "Plantão salvo");
     check(records[0].interval === "01:00", "Intervalo descontado armazenado");
+    await page.locator(".side-nav a[href='#overview']").click();
     await page.locator("#activityRegistration").selectOption("TESTE-001");
     await page.locator("#activityMonth").fill("2026-11");
     await page.locator("#activityCalendarGrid button[data-date='2026-11-12']").click();
     check(await page.locator(".activity-timeline-entry").count() === 1, "Linha do tempo mostra o lançamento do dia selecionado");
     check((await page.locator("#activityDayWorked").textContent()).includes("8h 00min"), "Resumo diário usa a jornada líquida calculada");
     check((await page.locator("#activityDayRecords").textContent()) === "1", "Resumo diário conta os lançamentos da matrícula selecionada");
+
+    await page.locator(".side-nav a[href='#newRecordPanel']").click();
 
     // Duplicate periods require explicit confirmation; cancelling must preserve the unsaved form.
     await fillIdentity();
@@ -247,7 +257,9 @@ async function run() {
     check(records.length === 5 && records[4].plate === "ABC1D23", "Viagem salva e placa normalizada");
 
     // Daily dashboard and individual monthly statement use the same custom schedule.
+    await page.locator(".side-nav a[href='#overview']").click();
     check((await page.locator("#totalOvertime").textContent()).includes("1h"), "Indicador de horas extras reflete jornada personalizada");
+    await page.locator(".side-nav a[href='#individualReportPanel']").click();
     await page.locator("#individualMonth").selectOption("2026-11");
     await page.locator("#individualEmployee").selectOption("TESTE-001");
     await page.locator("#generateIndividualReport").click();
@@ -258,6 +270,8 @@ async function run() {
     check(reportText.includes("17h 00min") && reportText.includes("1h 00min"), "Espelho consolida horas trabalhadas e extras");
     check(reportText.includes("4"), "Espelho inclui quatro dias com registros");
     
+    await page.locator(".side-nav a[href='#recordsPanel']").click();
+
     // CSV export should contain all service types and headings.
     const csvDownloadPromise = page.waitForEvent("download");
     await page.locator("#exportCsvButton").click();
@@ -285,6 +299,8 @@ async function run() {
     check(excelCheck.sheetNames.includes("Resumo mensal") && excelCheck.sheetNames.includes("Resumo por colaborador") && excelCheck.sheetNames.includes("Instruções"), "Excel contém as quatro abas esperadas");
     check(excelCheck.launchRows === 5, "Excel contém todos os lançamentos");
 
+    await page.locator(".side-nav a[href='#backupTitle']").click();
+
     // Backup round-trip includes records and personalized schedules.
     const backupDownloadPromise = page.waitForEvent("download");
     await page.locator("#exportBackupButton").click();
@@ -301,6 +317,7 @@ async function run() {
     });
     await page.reload({ waitUntil: "domcontentloaded" });
     page.once("dialog", (dialog) => dialog.accept());
+    await page.locator(".side-nav a[href='#backupTitle']").click();
     await page.locator("#backupFileInput").setInputFiles(backupPath);
     await page.waitForFunction(() => JSON.parse(localStorage.getItem("controleDePonto.registros.v1") || "[]").length === 5);
     check(await page.locator("#recordsBody tr").count() === 5, "Restauração reconstitui histórico");
@@ -308,6 +325,7 @@ async function run() {
     check(await page.evaluate(() => JSON.parse(localStorage.getItem("controleDePonto.escalas.v1") || "{}")["PLAN-12"].type) === "12x36", "Restauração reconstitui escala 12x36");
 
     // Mobile layout should not create page-level horizontal scrolling.
+    await page.locator(".side-nav a[href='#overview']").click();
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload({ waitUntil: "domcontentloaded" });
     const mobileWidths = await page.evaluate(() => ({
