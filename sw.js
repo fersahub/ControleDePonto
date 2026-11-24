@@ -3,7 +3,7 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./assets/css/style.css?v=auth-2",
-  "./assets/css/dashboard.css?v=dashboard-4",
+  "./assets/css/dashboard.css?v=tabs-1",
   "./assets/js/time-engine.js?v=dashboard-3",
   "./assets/js/schedule-engine.js?v=dashboard-3",
   "./assets/js/backend-config.js?v=auth-2",
