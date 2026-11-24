@@ -349,7 +349,7 @@ function importSchedules_(source) {
       const minutes = Number(entry[1]);
       if (!key || !Number.isInteger(minutes) || minutes < 1 || minutes > 1439) return;
       const value = { registration: key, dailyTargetMinutes: minutes, updatedAt: new Date().toISOString() };
-      upsertRow_(sheet, key, [key, minutes, value.updatedAt, JSON.stringify(value)]);
+      upsertRow_(sheet, key, [safeSheetText_(key), minutes, value.updatedAt, JSON.stringify(value)]);
       saved += 1;
     });
     return { saved: saved };
@@ -506,8 +506,11 @@ function recordSignature_(record) {
   return [
     normalizeRegistration_(record.registration), record.serviceType || "",
     record.startDate || "", record.startTime || "", record.endDate || "",
-    record.endTime || "", String(record.vehicleOrder || "").trim().toUpperCase(),
-    String(record.plate || "").trim().toUpperCase()
+    record.endTime || "", String(record.interval || ""),
+    String(record.vehicleOrder || "").trim().toUpperCase(),
+    String(record.plate || "").trim().toUpperCase(),
+    String(record.origin || "").trim().toUpperCase(),
+    String(record.destination || "").trim().toUpperCase()
   ].join("|");
 }
 
