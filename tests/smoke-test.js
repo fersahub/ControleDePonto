@@ -7,6 +7,8 @@ const html = read("index.html");
 const js = read("assets/js/app.js");
 const engine = read("assets/js/time-engine.js");
 const scheduleEngine = read("assets/js/schedule-engine.js");
+const sheetsClient = read("assets/js/sheets-client.js");
+const sheetsBackend = read("backend/apps-script/Code.gs");
 const manifest = JSON.parse(read("manifest.webmanifest"));
 const sw = read("sw.js");
 
@@ -31,15 +33,26 @@ if (missingAssets.length) throw new Error("Arquivos locais referenciados e ausen
 const scriptRefs = [...html.matchAll(/<script\s+src=["']([^"']+)["']/g)].map((match) => match[1].split(/[?#]/)[0]);
 const engineScriptIndex = scriptRefs.indexOf("assets/js/time-engine.js");
 const scheduleEngineScriptIndex = scriptRefs.indexOf("assets/js/schedule-engine.js");
+const sheetsClientScriptIndex = scriptRefs.indexOf("assets/js/sheets-client.js");
 const appScriptIndex = scriptRefs.indexOf("assets/js/app.js");
-if (engineScriptIndex < 0 || scheduleEngineScriptIndex < 0 || appScriptIndex < 0 || engineScriptIndex > scheduleEngineScriptIndex || scheduleEngineScriptIndex > appScriptIndex) throw new Error("Os motores de cálculo devem carregar antes do aplicativo.");
+if (engineScriptIndex < 0 || scheduleEngineScriptIndex < 0 || sheetsClientScriptIndex < 0 || appScriptIndex < 0 || engineScriptIndex > scheduleEngineScriptIndex || scheduleEngineScriptIndex > sheetsClientScriptIndex || sheetsClientScriptIndex > appScriptIndex) throw new Error("Os motores e o cliente Google Sheets devem carregar antes do aplicativo.");
 if (!engine.includes("calculateDailyMetrics") || !engine.includes("parseIntervalMinutes")) throw new Error("Motor de cálculo incompleto.");
 if (!scheduleEngine.includes("buildForecast") || !scheduleEngine.includes("normalizeConfig")) throw new Error("Motor de escalas incompleto.");
 if (!manifest.icons.some((icon) => icon.sizes === "192x192") || !manifest.icons.some((icon) => icon.sizes === "512x512")) throw new Error("O manifesto precisa declarar ícones de 192px e 512px.");
 if (manifest.start_url !== "./" || manifest.scope !== "./") throw new Error("Manifesto PWA com escopo inesperado.");
 if (!sw.includes("addAll(APP_SHELL)") || !sw.includes("caches.match(request)") || !sw.includes("schedule-engine.js")) throw new Error("Service Worker sem cache essencial/offline.");
-for (const required of ["exportBackup", "importBackup", "calculateDailyMetrics", "generateIndividualReport", "renderShiftCalendar", "loadShiftPlans", "renderDashboardExtras", "renderActivityCalendar", "renderActivityTimeline"]) {
+for (const required of ["exportBackup", "importBackup", "calculateDailyMetrics", "generateIndividualReport", "renderShiftCalendar", "loadShiftPlans", "renderDashboardExtras", "renderActivityCalendar", "renderActivityTimeline", "connectCloudDatabase", "refreshCloudDatabase", "importCloudBackup", "sendLocalDataToCloud"]) {
   if (!js.includes("function " + required)) throw new Error("Função essencial ausente: " + required);
 }
 
 console.log("Smoke test aprovado: IDs, arquivos locais, manifesto PWA, cache offline e funções essenciais.");
+
+for (const required of ["setupControleDePonto", "doPost", "getAll_", "saveRecord_", "importRecords_", "importSchedules_", "importShiftPlans_", "validateApiKey_", "withWriteLock_"]) {
+  if (!sheetsBackend.includes("function " + required)) throw new Error("Função essencial do backend ausente: " + required);
+}
+for (const required of ["function request", "function configure", "postMessage", "sessionStorage"]) {
+  if (!sheetsClient.includes(required)) throw new Error("Cliente Google Sheets incompleto: " + required);
+}
+for (const required of ["cloudEndpoint", "cloudAccessCode", "cloudBackupFileInput", "importCloudBackupButton", "syncLocalDataButton"]) {
+  if (!ids.includes(required)) throw new Error("Controle da integração Google Sheets ausente: " + required);
+}
