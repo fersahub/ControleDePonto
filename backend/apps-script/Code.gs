@@ -299,12 +299,8 @@ function publicUser_(user) {
 }
 
 function ping_(user) {
-  const ss = getSpreadsheet_();
-  return { connected: true, apiVersion: CP.version, role: user.role, counts: {
-    records: Math.max(0, getSheet_(CP.sheets.records).getLastRow() - 1),
-    schedules: Math.max(0, getSheet_(CP.sheets.schedules).getLastRow() - 1),
-    shifts: Math.max(0, getSheet_(CP.sheets.shifts).getLastRow() - 1)
-  } };
+  getSpreadsheet_();
+  return { connected: true, apiVersion: CP.version, role: user.role };
 }
 
 function getAll_(user) {
