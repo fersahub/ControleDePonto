@@ -12,13 +12,14 @@
   <link rel="apple-touch-icon" href="./assets/icons/icon-192.svg">
   <title>Meu Controle de Jornada</title>
   <link rel="stylesheet" href="assets/css/style.css?v=auth-2">
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=dashboard-4">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=tabs-1">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script src="assets/js/time-engine.js?v=dashboard-3" defer></script>
   <script src="assets/js/schedule-engine.js?v=dashboard-3" defer></script>
   <script src="assets/js/backend-config.js?v=auth-2" defer></script>
   <script src="assets/js/sheets-client.js?v=auth-2" defer></script>
-  <script src="assets/js/app.js?v=auth-2" defer></script>
+  <script src="assets/js/navigation.js?v=tabs-1" defer></script>
+  <script src="assets/js/app.js?v=auth-3" defer></script>
 </head>
 <body class="auth-required">
   <section class="auth-screen" id="authScreen" aria-labelledby="authTitle">
@@ -56,18 +57,22 @@
 
     <aside class="side-nav" aria-label="Navegação principal">
       <p class="side-nav-label">MENU PRINCIPAL</p>
-      <a class="side-nav-link is-active" href="#overview"><span aria-hidden="true">⌂</span> Visão geral</a>
-      <a class="side-nav-link" href="#scheduleTitle"><span aria-hidden="true">◷</span> Minha jornada</a>
-      <a class="side-nav-link" href="#shiftPlannerPanel"><span aria-hidden="true">▦</span> Planejador de escalas</a>
-      <a class="side-nav-link" href="#newRecordPanel"><span aria-hidden="true">＋</span> Novo lançamento</a>
-      <a class="side-nav-link" href="#recordsPanel"><span aria-hidden="true">▤</span> Histórico</a>
-      <a class="side-nav-link" href="#individualReportPanel"><span aria-hidden="true">▧</span> Espelho mensal</a>
+      <a class="side-nav-link is-active" href="#overview" data-tab-target="tab-overview" aria-controls="tab-overview" aria-current="page"><span aria-hidden="true">⌂</span> Visão geral</a>
+      <a class="side-nav-link" href="#scheduleTitle" data-tab-target="tab-journey" aria-controls="tab-journey"><span aria-hidden="true">◷</span> Minha jornada</a>
+      <a class="side-nav-link" href="#shiftPlannerPanel" data-tab-target="tab-shifts" aria-controls="tab-shifts"><span aria-hidden="true">▦</span> Planejador de escalas</a>
+      <a class="side-nav-link" href="#newRecordPanel" data-tab-target="tab-new-record" aria-controls="tab-new-record"><span aria-hidden="true">＋</span> Novo lançamento</a>
+      <a class="side-nav-link" href="#recordsPanel" data-tab-target="tab-history" aria-controls="tab-history"><span aria-hidden="true">▤</span> Histórico</a>
+      <a class="side-nav-link" href="#individualReportPanel" data-tab-target="tab-report" aria-controls="tab-report"><span aria-hidden="true">▧</span> Espelho mensal</a>
       <div class="side-nav-divider"></div>
-      <a class="side-nav-link side-nav-secondary" href="#backupTitle"><span aria-hidden="true">↥</span> Backup e restauração</a>
+      <a class="side-nav-link side-nav-secondary" href="#backupTitle" data-tab-target="tab-backup" aria-controls="tab-backup"><span aria-hidden="true">↥</span> Backup e restauração</a>
+      <a class="side-nav-link side-nav-secondary" href="#accountTitle" data-tab-target="tab-account" aria-controls="tab-account"><span aria-hidden="true">⚙</span> Minha conta</a>
+      <a class="side-nav-link side-nav-secondary admin-only is-hidden" href="#cloudDatabaseTitle" data-tab-target="tab-admin" aria-controls="tab-admin"><span aria-hidden="true">▣</span> Administração</a>
       <div class="side-nav-footer"><span class="side-nav-footer-dot"></span><span>Conta individual · Banco central</span></div>
     </aside>
 
     <main id="overview">
+      <section class="tab-page is-active" id="tab-overview" data-tab-page aria-label="Visão geral">
+
       <section class="page-heading">
         <div>
           <p class="eyebrow">MEU TEMPO <span>/</span> JORNADA</p>
@@ -192,7 +197,11 @@
         <p class="activity-calendar-note" id="activityCalendarNote">Selecione uma matrícula com escala salva para visualizar trabalho e descanso planejados. Sem escala, o calendário mostra apenas os lançamentos existentes.</p>
       </section>
 
-      <section class="panel schedule-panel" aria-labelledby="scheduleTitle">
+      
+      </section>
+
+      <section class="tab-page" id="tab-journey" data-tab-page aria-label="Minha jornada" hidden>
+<section class="panel schedule-panel" aria-labelledby="scheduleTitle">
         <div class="panel-heading"><div class="panel-title-wrap"><span class="section-index">00</span><div><h2 id="scheduleTitle">Minha jornada personalizada</h2><p>Configure a carga diária esperada para cada matrícula. O padrão continua sendo 7h20.</p></div></div></div>
         <div class="schedule-controls">
           <div class="field"><label for="scheduleRegistration">Matrícula</label><input id="scheduleRegistration" type="text" maxlength="30" placeholder="Informe sua matrícula"></div>
@@ -204,7 +213,11 @@
         <div class="schedule-note">A carga configurada é aplicada aos lançamentos da sua matrícula. Nesta versão, você define a carga diária; escalas cíclicas como 12x36 ainda não montam automaticamente o calendário de trabalho e descanso.</div>
       </section>
 
-      <section class="panel shift-planner-panel" id="shiftPlannerPanel" aria-labelledby="shiftPlannerTitle">
+      
+      </section>
+
+      <section class="tab-page" id="tab-shifts" data-tab-page aria-label="Planejador de escalas" hidden>
+<section class="panel shift-planner-panel" id="shiftPlannerPanel" aria-labelledby="shiftPlannerTitle">
         <div class="panel-heading">
           <div class="panel-title-wrap">
             <span class="section-index">00B</span>
@@ -260,7 +273,11 @@
         </table></div>
       </section>
 
-      <section class="panel backup-panel" aria-labelledby="backupTitle">
+      
+      </section>
+
+      <section class="tab-page" id="tab-backup" data-tab-page aria-label="Backup e restauração" hidden>
+<section class="panel backup-panel" aria-labelledby="backupTitle">
         <div class="panel-heading">
           <div class="panel-title-wrap"><span class="section-index">00A</span><div><h2 id="backupTitle">Backup e restauração</h2><p>Proteja seus registros e transfira seus dados para outro navegador ou computador.</p></div></div>
         </div>
@@ -272,7 +289,11 @@
         <p class="backup-note">O backup inclui lançamentos e jornadas personalizadas. A restauração substitui os dados locais atuais. Guarde o arquivo em local seguro; ele contém informações pessoais.</p>
       </section>
 
-      <section class="panel account-panel" id="accountPanel" aria-labelledby="accountTitle">
+      
+      </section>
+
+      <section class="tab-page" id="tab-account" data-tab-page aria-label="Minha conta" hidden>
+<section class="panel account-panel" id="accountPanel" aria-labelledby="accountTitle">
         <div class="panel-heading">
           <div class="panel-title-wrap"><span class="section-index">CONTA</span><div><h2 id="accountTitle">Minha conta</h2><p id="accountDescription">Sua sessão individual está protegida pelo banco central.</p></div></div>
           <button id="logoutButton" class="button button-quiet" type="button">Sair da conta</button>
@@ -293,7 +314,11 @@
         </form>
       </section>
 
-      <section class="panel cloud-db-panel admin-only" id="cloudDatabasePanel" aria-labelledby="cloudDatabaseTitle">
+      
+      </section>
+
+      <section class="tab-page" id="tab-admin" data-tab-page aria-label="Administração" hidden>
+<section class="panel cloud-db-panel admin-only" id="cloudDatabasePanel" aria-labelledby="cloudDatabaseTitle">
         <div class="panel-heading">
           <div class="panel-title-wrap"><span class="section-index">ADMIN</span><div><h2 id="cloudDatabaseTitle">Administração do banco central</h2><p>Gerencie contas e acompanhe a sincronização da base geral.</p></div></div>
           <span class="planner-mode-label">Administrador</span>
@@ -324,7 +349,11 @@
         </div>
       </section>
 
-      <section class="panel form-panel" id="newRecordPanel">
+      
+      </section>
+
+      <section class="tab-page" id="tab-new-record" data-tab-page aria-label="Novo lançamento" hidden>
+<section class="panel form-panel" id="newRecordPanel">
         <div class="panel-heading">
           <div class="panel-title-wrap">
             <span class="section-index">01</span>
@@ -449,7 +478,11 @@
         </form>
       </section>
 
-      <section class="panel records-panel" id="recordsPanel">
+      
+      </section>
+
+      <section class="tab-page" id="tab-history" data-tab-page aria-label="Histórico" hidden>
+<section class="panel records-panel" id="recordsPanel">
         <div class="panel-heading records-heading">
           <div class="panel-title-wrap">
             <span class="section-index">02</span>
@@ -519,7 +552,11 @@
         </div>
       </section>
 
-      <section class="panel individual-panel" id="individualReportPanel">
+      
+      </section>
+
+      <section class="tab-page" id="tab-report" data-tab-page aria-label="Espelho mensal" hidden>
+<section class="panel individual-panel" id="individualReportPanel">
         <div class="panel-heading">
           <div class="panel-title-wrap">
             <span class="section-index">03</span>
@@ -545,7 +582,9 @@
         <p class="individual-hint">O relatório considera os lançamentos salvos neste navegador e respeita a jornada diária configurada para a matrícula.</p>
         <div id="individualReportOutput" class="individual-report-output is-hidden" aria-live="polite"></div>
       </section>
-    </main>
+    
+      </section>
+</main>
 
     <footer class="site-footer">
       <span>Meu Controle de Jornada <span class="footer-separator">/</span> Pessoal</span>
