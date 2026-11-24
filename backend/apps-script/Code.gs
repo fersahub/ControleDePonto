@@ -588,7 +588,6 @@ function passwordHash_(password, salt) {
   return bytesToHex_(Utilities.computeHmacSha256Signature(String(password) + "|" + salt, pepper, Utilities.Charset.UTF_8));
 }
 function bytesToHex_(bytes) { return bytes.map(value => ("0" + (value & 255).toString(16)).slice(-2)).join(""); }
-}
 function constantTimeEquals_(a,b) { a=String(a || ""); b=String(b || ""); if (a.length !== b.length) return false; let diff=0; for (let i=0;i<a.length;i++) diff |= a.charCodeAt(i)^b.charCodeAt(i); return diff===0; }
 function validateOrigin_(origin) {
   const configured = PropertiesService.getScriptProperties().getProperty(CP.originsProperty) || "https://fersahub.github.io";
