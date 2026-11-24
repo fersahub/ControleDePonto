@@ -2,13 +2,13 @@
 
 (() => {
   const bootUser = window.SheetsBackend ? SheetsBackend.getCachedUser() : null;
-  const storageScope = bootUser && bootUser.id ? bootUser.id : "anonymous";
+  const storageScope = bootUser && bootUser.role === "admin" ? "admin" : (bootUser && bootUser.id ? bootUser.id : "anonymous");
   const LEGACY_STORAGE_KEY = "controleDePonto.registros.v1";
   const LEGACY_SCHEDULES_KEY = "controleDePonto.jornadas.v1";
   const LEGACY_SHIFT_PLANS_KEY = "controleDePonto.escalas.v1";
-  const STORAGE_KEY = "controleDePonto.registros.v2." + storageScope;
-  const SCHEDULES_KEY = "controleDePonto.jornadas.v2." + storageScope;
-  const SHIFT_PLANS_KEY = "controleDePonto.escalas.v2." + storageScope;
+  const STORAGE_KEY = storageScope === "admin" ? LEGACY_STORAGE_KEY : "controleDePonto.registros.v2." + storageScope;
+  const SCHEDULES_KEY = storageScope === "admin" ? LEGACY_SCHEDULES_KEY : "controleDePonto.jornadas.v2." + storageScope;
+  const SHIFT_PLANS_KEY = storageScope === "admin" ? LEGACY_SHIFT_PLANS_KEY : "controleDePonto.escalas.v2." + storageScope;
   const CONTRACT_MINUTES = 7 * 60 + 20;
   const scheduleRegistrationInput = document.getElementById("scheduleRegistration");
   const schedulePreset = document.getElementById("schedulePreset");
