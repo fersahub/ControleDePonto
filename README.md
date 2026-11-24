@@ -1,6 +1,6 @@
 # Meu Controle de Jornada
 
-Aplicativo pessoal, estático e instalável para registrar jornadas, intervalos, folgas e horas extras. O projeto funciona no GitHub Pages sem servidor ou conta de usuário; os dados permanecem no navegador.
+Aplicativo instalável para registrar jornadas, intervalos, folgas e horas extras. O site continua hospedado no GitHub Pages; os dados permanecem no armazenamento local como cópia offline e podem ser sincronizados com um banco central Google Sheets por meio de um backend Google Apps Script.
 
 ## Funcionalidades
 
@@ -57,7 +57,7 @@ Antes de salvar, o sistema compara a matrícula e o período informado com os re
 
 ## Armazenamento e limites
 
-Esta versão é estática. Os registros ficam no `localStorage` do navegador utilizado, portanto não são sincronizados entre computadores, navegadores ou usuários. Limpar os dados do navegador pode apagar os registros locais.
+O `localStorage` continua sendo utilizado como cópia local/offline. Quando o backend Google Apps Script estiver configurado no painel **Banco central (Google Sheets)**, novos lançamentos, jornadas e escalas serão sincronizados com a planilha. A atualização do navegador consulta e mescla os dados do banco central com a cópia local. Sem configurar o backend, o aplicativo continua operando apenas localmente. Limpar os dados do navegador pode apagar a cópia local; mantenha backups.
 
 A exportação Excel inclui todos os registros armazenados naquele navegador. Use o filtro da coluna **Competência** na aba **Lançamentos** para selecionar um mês. Na aba **Resumo por colaborador**, filtre Competência, Colaborador ou Matrícula para consultar e imprimir o resumo individual. Depois de filtrar, use Arquivo → Imprimir; recomenda-se papel A4, orientação paisagem e ajuste à largura de uma página. No site, o filtro mensal limita o histórico e a impressão. O espelho individual é gerado diretamente na página, após selecionar competência e matrícula, e pode ser impresso separadamente. A exportação Excel exige acesso ao CDN oficial SheetJS.
 
@@ -109,3 +109,38 @@ A seção **Planejador de escalas** salva uma configuração independente por ma
 A projeção considera entrada, duração do turno e intervalo planejado. O calendário cruza as datas de trabalho com lançamentos de Plantão e Viagem da mesma matrícula. Dias passados de trabalho sem lançamento são sinalizados como **Sem lançamento**; isso não significa falta ou ausência, pois o aplicativo não conhece justificativas, atestados, férias ou alterações feitas pelo empregador.
 
 As escalas ficam no armazenamento local e entram nos backups versão 2. O aplicativo continua aceitando backups anteriores versão 1. O planejamento não altera lançamentos, a jornada diária personalizada nem o cálculo atual de horas extras. A apuração continua diária, conforme a carga configurada em **Minha jornada personalizada**; o planejador não calcula limites semanais, DSR, adicional noturno, feriados ou regras legais/convenções.
+
+
+## Banco central Google Sheets
+
+O projeto inclui um backend em `backend/apps-script/Code.gs` e um cliente de integração em `assets/js/sheets-client.js`.
+
+### Configuração inicial
+
+Consulte o passo a passo em [backend/README.md](backend/README.md). Em resumo:
+
+1. Criar um projeto Google Apps Script e copiar `backend/apps-script/Code.gs`.
+2. Configurar o manifesto usando `backend/apps-script/appsscript.json`.
+3. Executar `setupControleDePonto()` para criar a planilha e as abas `LANCAMENTOS`, `JORNADAS` e `ESCALAS`.
+4. Criar uma implantação de Aplicativo da Web e copiar a URL terminada em `/exec`.
+5. No site, informar a URL e a chave API compartilhada no painel **Banco central (Google Sheets)**.
+
+### Sincronização e migração de dados locais
+
+- O site continua mantendo uma cópia no navegador para uso offline e contingência.
+- Quando conectado, novos lançamentos, jornadas e escalas são enviados ao backend.
+- **Enviar dados locais para o banco** transfere a cópia atual do navegador sem apagar dados da planilha.
+- **Baixar backup completo** gera o JSON usado para transportar dados de outros navegadores.
+- **Importar backup local para o banco central** permite carregar esse JSON para a base geral. A importação faz mesclagem: IDs ou assinaturas de lançamentos já existentes são ignorados; jornadas e escalas são atualizadas pela matrícula.
+- A importação pode ser repetida. Se uma transferência for interrompida, os lotes concluídos não serão inseridos novamente ao repetir.
+- Atualizar o banco central mescla os registros recebidos à cópia local; não substitui o armazenamento local por um conjunto menor.
+
+### Limite de acesso nesta etapa
+
+Esta entrega não implementa login individual. O backend usa uma chave de acesso compartilhada armazenada nas propriedades privadas do Apps Script e solicitada no painel do site. Qualquer pessoa que possua essa chave pode consultar e alterar a base compartilhada inteira. Não há isolamento de dados por usuário; por isso, distribua a chave somente a pessoas autorizadas a acessar todos os registros. A planilha deve permanecer privada e não ser compartilhada diretamente com usuários do site.
+
+A autenticação individual, o cadastro de usuários e a separação de registros por pessoa permanecem fora do escopo atual e precisarão ser implementados antes de oferecer dados individuais a vários usuários.
+
+### Limites
+
+O Google Apps Script tem cotas e limites de execução que podem mudar. A planilha é adequada para uma operação inicial de volume modesto, mas não substitui um banco de dados transacional de alta concorrência. Consulte: https://developers.google.com/apps-script/guides/services/quotas
