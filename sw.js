@@ -1,4 +1,4 @@
-const CACHE_NAME = "meu-controle-jornada-v3-auth-3";
+const CACHE_NAME = "meu-controle-jornada-v3-tabs-1";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,7 +8,8 @@ const APP_SHELL = [
   "./assets/js/schedule-engine.js?v=dashboard-3",
   "./assets/js/backend-config.js?v=auth-2",
   "./assets/js/sheets-client.js?v=auth-2",
-  "./assets/js/app.js?v=auth-2",
+  "./assets/js/navigation.js?v=tabs-1",
+  "./assets/js/app.js?v=auth-3",
   "./manifest.webmanifest",
   "./assets/icons/icon-192.svg",
   "./assets/icons/icon-512.svg",
