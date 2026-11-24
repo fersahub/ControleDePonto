@@ -35,8 +35,16 @@ const engineScriptIndex = scriptRefs.indexOf("assets/js/time-engine.js");
 const scheduleEngineScriptIndex = scriptRefs.indexOf("assets/js/schedule-engine.js");
 const backendConfigScriptIndex = scriptRefs.indexOf("assets/js/backend-config.js");
 const sheetsClientScriptIndex = scriptRefs.indexOf("assets/js/sheets-client.js");
+const navigationScriptIndex = scriptRefs.indexOf("assets/js/navigation.js");
 const appScriptIndex = scriptRefs.indexOf("assets/js/app.js");
-if (engineScriptIndex < 0 || scheduleEngineScriptIndex < 0 || backendConfigScriptIndex < 0 || sheetsClientScriptIndex < 0 || appScriptIndex < 0 || engineScriptIndex > scheduleEngineScriptIndex || scheduleEngineScriptIndex > backendConfigScriptIndex || backendConfigScriptIndex > sheetsClientScriptIndex || sheetsClientScriptIndex > appScriptIndex) throw new Error("Os motores e o cliente Google Sheets devem carregar antes do aplicativo.");
+if (engineScriptIndex < 0 || scheduleEngineScriptIndex < 0 || backendConfigScriptIndex < 0 || sheetsClientScriptIndex < 0 || appScriptIndex < 0 || engineScriptIndex > scheduleEngineScriptIndex || scheduleEngineScriptIndex > backendConfigScriptIndex || backendConfigScriptIndex > sheetsClientScriptIndex || sheetsClientScriptIndex > navigationScriptIndex || navigationScriptIndex < 0 || navigationScriptIndex > appScriptIndex) throw new Error("Os motores e o cliente Google Sheets devem carregar antes do aplicativo.");
+const tabPages = [...html.matchAll(/<section class="tab-page[^"]*" id="([^"]+)" data-tab-page/g)].map((match) => match[1]);
+if (tabPages.length !== 9 || new Set(tabPages).size !== 9) throw new Error("O painel deve apresentar nove abas independentes e únicas.");
+for (const target of ["tab-overview", "tab-journey", "tab-shifts", "tab-new-record", "tab-history", "tab-report", "tab-backup", "tab-account", "tab-admin"]) {
+  if (!html.includes('data-tab-target="' + target + '"') || !tabPages.includes(target)) throw new Error("Aba sem navegação ou conteúdo correspondente: " + target);
+}
+if (!sw.includes("navigation.js") || !sw.includes("dashboard.css?v=tabs-1")) throw new Error("Cache offline sem os recursos da navegação por abas.");
+
 if (!engine.includes("calculateDailyMetrics") || !engine.includes("parseIntervalMinutes")) throw new Error("Motor de cálculo incompleto.");
 if (!scheduleEngine.includes("buildForecast") || !scheduleEngine.includes("normalizeConfig")) throw new Error("Motor de escalas incompleto.");
 if (!manifest.icons.some((icon) => icon.sizes === "192x192") || !manifest.icons.some((icon) => icon.sizes === "512x512")) throw new Error("O manifesto precisa declarar ícones de 192px e 512px.");
