@@ -16,7 +16,8 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script src="assets/js/time-engine.js?v=dashboard-3" defer></script>
   <script src="assets/js/schedule-engine.js?v=dashboard-3" defer></script>
-  <script src="assets/js/app.js?v=dashboard-4" defer></script>
+  <script src="assets/js/sheets-client.js?v=sheets-1" defer></script>
+  <script src="assets/js/app.js?v=cloud-1" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -255,6 +256,47 @@
           <input id="backupFileInput" type="file" accept=".json,application/json" hidden>
         </div>
         <p class="backup-note">O backup inclui lançamentos e jornadas personalizadas. A restauração substitui os dados locais atuais. Guarde o arquivo em local seguro; ele contém informações pessoais.</p>
+      </section>
+
+      <section class="panel cloud-db-panel" id="cloudDatabasePanel" aria-labelledby="cloudDatabaseTitle">
+        <div class="panel-heading">
+          <div class="panel-title-wrap"><span class="section-index">00D</span><div><h2 id="cloudDatabaseTitle">Banco central (Google Sheets)</h2><p>Conecte este navegador ao banco compartilhado e importe seus dados locais.</p></div></div>
+          <span class="planner-mode-label">Sincronização</span>
+        </div>
+        <div class="cloud-db-content">
+          <div class="cloud-db-fields">
+            <div class="field">
+              <label for="cloudEndpoint">URL da implantação do Apps Script</label>
+              <input id="cloudEndpoint" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="url">
+            </div>
+            <div class="field">
+              <label for="cloudAccessCode">Código de acesso compartilhado</label>
+              <input id="cloudAccessCode" type="password" placeholder="Cole a chave gerada no Apps Script" autocomplete="off">
+              <small class="field-hint">Não é um login individual. A chave fica somente na sessão deste navegador.</small>
+            </div>
+          </div>
+          <div class="cloud-db-actions">
+            <button id="connectCloudButton" class="button button-primary" type="button">Testar conexão</button>
+            <button id="refreshCloudButton" class="button button-outline" type="button" disabled>Atualizar dados do banco</button>
+            <button id="disconnectCloudButton" class="button button-quiet" type="button">Desconectar neste navegador</button>
+          </div>
+          <p id="cloudDbStatus" class="cloud-db-status" role="status" aria-live="polite">Banco central não configurado. Os dados continuam sendo salvos localmente neste navegador.</p>
+          <div class="cloud-db-import">
+            <div>
+              <strong>Importar backup local para o banco central</strong>
+              <p>Selecione um arquivo JSON gerado em “Baixar backup completo”. A importação acrescenta registros ainda ausentes; não apaga os dados que já estão na planilha.</p>
+            </div>
+            <div class="cloud-db-import-controls">
+              <div class="field">
+                <label for="cloudBackupFileInput">Arquivo de backup (.json)</label>
+                <input id="cloudBackupFileInput" type="file" accept=".json,application/json">
+              </div>
+              <button id="importCloudBackupButton" class="button button-primary" type="button" disabled>Importar backup para o banco</button>
+            </div>
+            <p id="cloudBackupPreview" class="cloud-db-preview" aria-live="polite">Nenhum backup selecionado.</p>
+          </div>
+          <p class="cloud-db-warning"><strong>Importante:</strong> nesta etapa, qualquer pessoa que tenha a chave compartilhada poderá consultar e alterar a base inteira. Ainda não existe login individual nem separação de registros por usuário. Não distribua a chave para pessoas que não devam ter acesso a todos os dados.</p>
+        </div>
       </section>
 
       <section class="panel form-panel" id="newRecordPanel">
