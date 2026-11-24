@@ -410,20 +410,27 @@
       }
       const normalized = normalizeBackupRecords(backup.records);
       if (backup.records.length && !normalized.records.length) throw new Error("Nenhum lançamento válido foi encontrado no backup.");
-      const restoredShiftPlans = normalizeBackupShiftPlans(backup.shiftSchedules || {});
+      let restoredRecords = normalized.records;
+      let restoredShiftPlans = normalizeBackupShiftPlans(backup.shiftSchedules || {});
       const restoredSchedules = {};
       Object.entries(backup.schedules).forEach(([registration, minutes]) => {
         const key = normalizeRegistration(registration);
         const value = Number(minutes);
         if (key && Number.isInteger(value) && value > 0 && value < 1440) restoredSchedules[key] = value;
       });
+      if (currentUser && currentUser.role === "employee") {
+        const ownRegistration = normalizeRegistration(currentUser.registration);
+        restoredRecords = restoredRecords.filter((record) => normalizeRegistration(record.registration) === ownRegistration);
+        Object.keys(restoredShiftPlans).forEach((key) => { if (key !== ownRegistration) delete restoredShiftPlans[key]; });
+        Object.keys(restoredSchedules).forEach((key) => { if (key !== ownRegistration) delete restoredSchedules[key]; });
+      }
       if (!window.confirm("A restauração substituirá todos os lançamentos e jornadas salvos neste navegador. Recomenda-se baixar um backup atual antes de continuar. Deseja prosseguir?")) return;
 
       const previousRecords = localStorage.getItem(STORAGE_KEY);
       const previousSchedules = localStorage.getItem(SCHEDULES_KEY);
       const previousShiftPlans = localStorage.getItem(SHIFT_PLANS_KEY);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized.records));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(restoredRecords));
         localStorage.setItem(SCHEDULES_KEY, JSON.stringify(restoredSchedules));
         localStorage.setItem(SHIFT_PLANS_KEY, JSON.stringify(restoredShiftPlans));
       } catch (storageError) {
@@ -432,7 +439,7 @@
         if (previousShiftPlans === null) localStorage.removeItem(SHIFT_PLANS_KEY); else localStorage.setItem(SHIFT_PLANS_KEY, previousShiftPlans);
         throw new Error("Não foi possível restaurar os dados neste navegador. " + storageError.message);
       }
-      records = normalized.records;
+      records = restoredRecords;
       Object.keys(schedules).forEach((key) => delete schedules[key]);
       Object.assign(schedules, restoredSchedules);
       Object.keys(shiftPlans).forEach((key) => delete shiftPlans[key]);
@@ -485,6 +492,12 @@
     const data = await SheetsBackend.request("getAll", {});
     if (!data || !Array.isArray(data.records)) throw new Error("O banco central retornou uma resposta incompleta.");
 
+    if (currentUser && currentUser.role === "employee") {
+      const ownRegistration = normalizeRegistration(currentUser.registration);
+      records = records.filter((record) => normalizeRegistration(record.registration) === ownRegistration);
+      Object.keys(schedules).forEach((key) => { if (normalizeRegistration(key) !== ownRegistration) delete schedules[key]; });
+      Object.keys(shiftPlans).forEach((key) => { if (normalizeRegistration(key) !== ownRegistration) delete shiftPlans[key]; });
+    }
     records = mergeById(records, data.records);
     Object.entries(data.schedules || {}).forEach(([registration, minutes]) => {
       const key = normalizeRegistration(registration);
