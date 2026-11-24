@@ -103,7 +103,7 @@
         else resolve(result);
       };
       const onMessage = (event) => {
-        if (event.source !== iframe.contentWindow) return;
+        if (event.origin !== "https://script.google.com" && !event.origin.endsWith(".googleusercontent.com")) return;
         const message = event.data;
         if (!message || message.channel !== CHANNEL || message.requestId !== requestId) return;
         const response = message.response || {};
