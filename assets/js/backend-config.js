@@ -1,5 +1,4 @@
-/* O endereço do Apps Script é público e fica configurado uma única vez para todos os navegadores. */
+/* Endereço público da implantação central do Apps Script. Não contém credenciais. */
 window.CONTROLE_PONTO_CONFIG = Object.freeze({
-  apiUrl: ""
-  // Depois da atualização do Apps Script, preencher uma única vez com a URL /exec.
+  apiUrl: "https://script.google.com/macros/s/AKfycbw8_wBNEhymOQBlXUnT4usz_tIyiWGaYYkKkTCeLF53tTTtHwXodbJG2gJAL2fhGKDsdA/exec"
 });
