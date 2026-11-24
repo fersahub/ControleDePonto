@@ -1,5 +1,28 @@
 "use strict";
 
+if (window.__CP_TEST_MODE === true) {
+  const testUser = { id: "test-admin", username: "admin.teste", fullName: "Administrador de Teste", registration: "", role: "admin", active: true, mustChange: false };
+  window.SheetsBackend = Object.freeze({
+    request: async (action) => {
+      if (action === "me") return testUser;
+      if (action === "ping") return { connected: true, apiVersion: "test" };
+      if (action === "getAll") return { records: [], schedules: {}, shiftSchedules: {} };
+      if (action === "listUsers") return [];
+      if (action === "createUser") return { user: testUser, temporaryPassword: "SenhaTemporariaTeste123!" };
+      if (action === "importRecords") return { imported: 0, skipped: 0 };
+      if (action === "importSchedules" || action === "importShiftPlans") return { saved: 0 };
+      return { saved: true, deleted: true };
+    },
+    login: async () => testUser,
+    logout: async () => {},
+    resume: async () => testUser,
+    hasSession: () => true,
+    getCachedUser: () => testUser,
+    clearSession: () => {},
+    getEndpoint: () => "https://script.google.com/macros/s/test/exec"
+  });
+} else {
+
 (() => {
   const SESSION_KEY = "controleDePonto.auth.session.v2";
   const CHANNEL = "CONTROLE_PONTO_SHEETS";
@@ -101,3 +124,4 @@
     getEndpoint: () => { try { return endpoint(); } catch (_) { return ""; } }
   });
 })();
+}
