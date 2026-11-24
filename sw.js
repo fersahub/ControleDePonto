@@ -2,7 +2,7 @@ const CACHE_NAME = "meu-controle-jornada-v2-cloud-1";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./assets/css/style.css?v=dashboard-3",
+  "./assets/css/style.css?v=cloud-1",
   "./assets/css/dashboard.css?v=dashboard-3",
   "./assets/js/time-engine.js?v=dashboard-3",
   "./assets/js/schedule-engine.js?v=dashboard-3",
