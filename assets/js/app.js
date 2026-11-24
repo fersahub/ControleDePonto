@@ -477,11 +477,11 @@
     Object.entries(data.schedules || {}).forEach(([registration, minutes]) => {
       const key = normalizeRegistration(registration);
       const value = Number(minutes);
-      if (key && Number.isInteger(value) && value > 0 && value < 1440) schedules[key] = value;
+      if (key && Number.isInteger(value) && value > 0 && value < 1440 && !Object.prototype.hasOwnProperty.call(schedules, key)) schedules[key] = value;
     });
     Object.entries(data.shiftSchedules || {}).forEach(([registration, config]) => {
       const key = normalizeRegistration(registration);
-      if (!key || !config || typeof config !== "object") return;
+      if (!key || !config || typeof config !== "object" || Object.prototype.hasOwnProperty.call(shiftPlans, key)) return;
       try { shiftPlans[key] = ScheduleEngine.normalizeConfig(config, key); }
       catch (error) { console.warn("Escala do banco ignorada para " + key + ".", error); }
     });
