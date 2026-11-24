@@ -16,10 +16,24 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script src="assets/js/time-engine.js?v=dashboard-3" defer></script>
   <script src="assets/js/schedule-engine.js?v=dashboard-3" defer></script>
-  <script src="assets/js/sheets-client.js?v=sheets-1" defer></script>
+  <script src="assets/js/backend-config.js?v=auth-1" defer></script>
+  <script src="assets/js/sheets-client.js?v=auth-1" defer></script>
   <script src="assets/js/app.js?v=cloud-1" defer></script>
 </head>
-<body>
+<body class="auth-required">
+  <section class="auth-screen" id="authScreen" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <span class="section-index">ACESSO</span>
+      <h1 id="authTitle">Controle de Ponto</h1>
+      <p>Entre com seu usuário e senha para acessar seus registros de jornada.</p>
+      <form id="loginForm" novalidate>
+        <div class="field"><label for="loginUsername">Usuário</label><input id="loginUsername" name="username" type="text" autocomplete="username" required maxlength="40" placeholder="Seu usuário"></div>
+        <div class="field"><label for="loginPassword">Senha</label><input id="loginPassword" name="password" type="password" autocomplete="current-password" required maxlength="100" placeholder="Sua senha"></div>
+        <button id="loginButton" class="button button-primary" type="submit">Entrar</button>
+      </form>
+      <p id="authFeedback" class="auth-feedback" role="status" aria-live="polite">Acesso individual protegido pelo banco central.</p>
+    </div>
+  </section>
   <div class="app-shell">
     <header class="topbar">
       <a class="brand" href="./" aria-label="Controle de Ponto - início">
@@ -36,7 +50,7 @@
       </a>
       <div class="topbar-meta">
         <span class="status-dot"></span>
-        <span>Modo pessoal</span>
+        <span id="topbarUserName">Sessão autenticada</span>
       </div>
     </header>
 
@@ -50,7 +64,7 @@
       <a class="side-nav-link" href="#individualReportPanel"><span aria-hidden="true">▧</span> Espelho mensal</a>
       <div class="side-nav-divider"></div>
       <a class="side-nav-link side-nav-secondary" href="#backupTitle"><span aria-hidden="true">↥</span> Backup e restauração</a>
-      <div class="side-nav-footer"><span class="side-nav-footer-dot"></span><span>Dados armazenados neste navegador</span></div>
+      <div class="side-nav-footer"><span class="side-nav-footer-dot"></span><span>Conta individual · Banco central</span></div>
     </aside>
 
     <main id="overview">
@@ -258,45 +272,55 @@
         <p class="backup-note">O backup inclui lançamentos e jornadas personalizadas. A restauração substitui os dados locais atuais. Guarde o arquivo em local seguro; ele contém informações pessoais.</p>
       </section>
 
-      <section class="panel cloud-db-panel" id="cloudDatabasePanel" aria-labelledby="cloudDatabaseTitle">
+      <section class="panel account-panel" id="accountPanel" aria-labelledby="accountTitle">
         <div class="panel-heading">
-          <div class="panel-title-wrap"><span class="section-index">00D</span><div><h2 id="cloudDatabaseTitle">Banco central (Google Sheets)</h2><p>Conecte este navegador ao banco compartilhado e importe seus dados locais.</p></div></div>
-          <span class="planner-mode-label">Sincronização</span>
+          <div class="panel-title-wrap"><span class="section-index">CONTA</span><div><h2 id="accountTitle">Minha conta</h2><p id="accountDescription">Sua sessão individual está protegida pelo banco central.</p></div></div>
+          <button id="logoutButton" class="button button-quiet" type="button">Sair da conta</button>
+        </div>
+        <div class="account-summary">
+          <strong id="accountName">—</strong><span id="accountDetails">—</span><span id="accountRole" class="planner-mode-label">Funcionário</span>
+        </div>
+        <form id="changePasswordForm" class="password-change-form" novalidate>
+          <h3>Alterar senha</h3>
+          <p id="passwordChangeHint">Use uma senha pessoal com pelo menos 10 caracteres.</p>
+          <div class="form-grid">
+            <div class="field"><label for="currentPassword">Senha atual</label><input id="currentPassword" type="password" autocomplete="current-password" required></div>
+            <div class="field"><label for="newPassword">Nova senha</label><input id="newPassword" type="password" autocomplete="new-password" minlength="10" required></div>
+            <div class="field"><label for="confirmPassword">Confirmar nova senha</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="10" required></div>
+          </div>
+          <button class="button button-outline" type="submit">Salvar nova senha</button>
+          <p id="passwordChangeFeedback" class="cloud-db-preview" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="panel cloud-db-panel admin-only" id="cloudDatabasePanel" aria-labelledby="cloudDatabaseTitle">
+        <div class="panel-heading">
+          <div class="panel-title-wrap"><span class="section-index">ADMIN</span><div><h2 id="cloudDatabaseTitle">Administração do banco central</h2><p>Gerencie contas e acompanhe a sincronização da base geral.</p></div></div>
+          <span class="planner-mode-label">Administrador</span>
         </div>
         <div class="cloud-db-content">
-          <div class="cloud-db-fields">
-            <div class="field">
-              <label for="cloudEndpoint">URL da implantação do Apps Script</label>
-              <input id="cloudEndpoint" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="url">
-            </div>
-            <div class="field">
-              <label for="cloudAccessCode">Código de acesso compartilhado</label>
-              <input id="cloudAccessCode" type="password" placeholder="Cole a chave gerada no Apps Script" autocomplete="off">
-              <small class="field-hint">Não é um login individual. A chave fica somente na sessão deste navegador.</small>
-            </div>
+          <p id="cloudDbStatus" class="cloud-db-status" role="status" aria-live="polite">Conectando ao banco central...</p>
+          <div class="admin-users-panel" id="adminUsersPanel">
+            <h3>Contas de funcionários</h3>
+            <p>Crie uma conta por funcionário. O sistema gera uma senha temporária que deverá ser alterada no primeiro acesso.</p>
+            <form id="createUserForm" class="form-grid" novalidate>
+              <div class="field"><label for="newUserName">Nome completo</label><input id="newUserName" maxlength="120" required></div>
+              <div class="field"><label for="newUserRegistration">Matrícula</label><input id="newUserRegistration" maxlength="30" required></div>
+              <div class="field"><label for="newUsername">Nome de usuário</label><input id="newUsername" maxlength="40" required placeholder="Ex.: joao.silva"></div>
+              <div class="field field-span-2"><button id="createUserButton" class="button button-primary" type="submit">Criar conta</button></div>
+            </form>
+            <p id="adminUserFeedback" class="cloud-db-preview" role="status" aria-live="polite"></p>
+            <div id="adminUsersList" class="admin-users-list" aria-live="polite"><p>Carregando contas...</p></div>
           </div>
-          <div class="cloud-db-actions">
-            <button id="connectCloudButton" class="button button-primary" type="button">Testar conexão</button>
-            <button id="syncLocalDataButton" class="button button-outline" type="button" disabled>Enviar dados locais para o banco</button>
-            <button id="refreshCloudButton" class="button button-outline" type="button" disabled>Atualizar dados do banco</button>
-            <button id="disconnectCloudButton" class="button button-quiet" type="button">Desconectar neste navegador</button>
-          </div>
-          <p id="cloudDbStatus" class="cloud-db-status" role="status" aria-live="polite">Banco central não configurado. Os dados continuam sendo salvos localmente neste navegador.</p>
           <div class="cloud-db-import">
-            <div>
-              <strong>Importar backup local para o banco central</strong>
-              <p>Selecione um arquivo JSON gerado em “Baixar backup completo”. A importação acrescenta registros ainda ausentes; não apaga os dados que já estão na planilha.</p>
-            </div>
+            <div><strong>Migração de dados antigos</strong><p>Use somente no administrador para importar backups locais que ainda não estejam na planilha. A importação preserva os dados existentes.</p></div>
             <div class="cloud-db-import-controls">
-              <div class="field">
-                <label for="cloudBackupFileInput">Arquivo de backup (.json)</label>
-                <input id="cloudBackupFileInput" type="file" accept=".json,application/json">
-              </div>
+              <div class="field"><label for="cloudBackupFileInput">Arquivo de backup (.json)</label><input id="cloudBackupFileInput" type="file" accept=".json,application/json"></div>
               <button id="importCloudBackupButton" class="button button-primary" type="button" disabled>Importar backup para o banco</button>
             </div>
             <p id="cloudBackupPreview" class="cloud-db-preview" aria-live="polite">Nenhum backup selecionado.</p>
           </div>
-          <p class="cloud-db-warning"><strong>Importante:</strong> nesta etapa, qualquer pessoa que tenha a chave compartilhada poderá consultar e alterar a base inteira. Ainda não existe login individual nem separação de registros por usuário. Não distribua a chave para pessoas que não devam ter acesso a todos os dados.</p>
+          <div class="cloud-db-actions"><button id="refreshCloudButton" class="button button-outline" type="button" disabled>Atualizar dados do banco</button><button id="syncLocalDataButton" class="button button-outline" type="button" disabled>Enviar dados antigos deste navegador</button></div>
         </div>
       </section>
 
