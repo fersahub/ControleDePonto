@@ -1,385 +1,466 @@
 /**
- * ControleDePonto — API para Google Sheets
- * Backend do aplicativo hospedado no GitHub Pages.
- *
- * PRIMEIRA CONFIGURAÇÃO:
- * 1. Abra um projeto Apps Script e cole este arquivo.
- * 2. Execute setupControleDePonto() manualmente.
- * 3. Copie do Registro de execução a URL da planilha e a chave API.
- * 4. Implante como Aplicativo da Web: executar como proprietário,
- *    acesso "Qualquer pessoa". A chave compartilhada é exigida em cada chamada.
- *
- * IMPORTANTE:
- * A chave compartilhada é uma barreira provisória, não autenticação individual.
- * Qualquer pessoa que possua a chave pode consultar a base inteira.
- * Não use este modo para separar dados pessoais entre usuários.
+ * ControleDePonto — backend multiusuário para Google Sheets.
+ * A planilha existente é preservada. O acesso aos dados é sempre autorizado
+ * no servidor por sessão individual; nunca confie em filtros feitos no navegador.
  */
 
 const CP = Object.freeze({
-  version: "1.0.0",
+  version: "2.0.0",
   spreadsheetProperty: "CP_SPREADSHEET_ID",
-  secretProperty: "CP_SHARED_API_KEY",
+  pepperProperty: "CP_PASSWORD_PEPPER",
   originsProperty: "CP_ALLOWED_ORIGINS",
+  sessionDays: 14,
   maxPayloadBytes: 1800000,
   sheets: {
     records: "LANCAMENTOS",
     schedules: "JORNADAS",
-    shifts: "ESCALAS"
+    shifts: "ESCALAS",
+    users: "USUARIOS",
+    sessions: "SESSOES"
   },
   headers: {
-    records: [
-      "ID", "MATRICULA", "NOME", "DATA_INICIAL", "HORA_INICIAL",
-      "INTERVALO", "DATA_FINAL", "HORA_FINAL", "ORDEM_VEICULO",
-      "PLACA", "TIPO_SERVICO", "ORIGEM", "DESTINO", "CRIADO_EM",
-      "ATUALIZADO_EM", "DADOS_JSON"
-    ],
-    schedules: ["MATRICULA", "JORNADA_MINUTOS", "ATUALIZADO_EM", "DADOS_JSON"],
-    shifts: [
-      "MATRICULA", "TIPO", "DATA_BASE", "HORA_INICIAL",
-      "DURACAO_MINUTOS", "INTERVALO_MINUTOS", "DIAS_TRABALHO",
-      "DIAS_DESCANSO", "ATUALIZADO_EM", "DADOS_JSON"
-    ]
+    records: ["ID","MATRICULA","NOME","DATA_INICIAL","HORA_INICIAL","INTERVALO","DATA_FINAL","HORA_FINAL","ORDEM_VEICULO","PLACA","TIPO_SERVICO","ORIGEM","DESTINO","CRIADO_EM","ATUALIZADO_EM","DADOS_JSON"],
+    schedules: ["MATRICULA","JORNADA_MINUTOS","ATUALIZADO_EM","DADOS_JSON"],
+    shifts: ["MATRICULA","TIPO","DATA_BASE","HORA_INICIAL","DURACAO_MINUTOS","INTERVALO_MINUTOS","DIAS_TRABALHO","DIAS_DESCANSO","ATUALIZADO_EM","DADOS_JSON"],
+    users: ["ID","USUARIO","NOME_COMPLETO","MATRICULA","PAPEL","SALT","SENHA_HASH","ATIVO","TROCAR_SENHA","CRIADO_EM"],
+    sessions: ["TOKEN_HASH","USUARIO_ID","CRIADO_EM","EXPIRA_EM","REVOGADO_EM"]
   }
 });
 
-/**
- * Cria a planilha central (apenas na primeira execução), cria as abas e
- * gera uma chave API compartilhada. Execute manualmente no editor do Apps Script.
- */
+/** Executar uma vez no projeto Apps Script ligado à planilha já utilizada. */
 function setupControleDePonto() {
   const props = PropertiesService.getScriptProperties();
-  let spreadsheetId = props.getProperty(CP.spreadsheetProperty);
-  let spreadsheet;
+  let id = props.getProperty(CP.spreadsheetProperty);
+  let ss = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.create("ControleDePonto — Banco Central");
+  if (!id) props.setProperty(CP.spreadsheetProperty, ss.getId());
+  ss.setSpreadsheetTimeZone("America/Bahia");
+  ensureDatabaseSheets_(ss);
+  if (!props.getProperty(CP.pepperProperty)) props.setProperty(CP.pepperProperty, randomSecret_());
+  props.setProperty(CP.originsProperty, props.getProperty(CP.originsProperty) || "https://fersahub.github.io");
 
-  if (spreadsheetId) {
-    spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-  } else {
-    spreadsheet = SpreadsheetApp.create("ControleDePonto — Banco Central");
-    spreadsheetId = spreadsheet.getId();
-    props.setProperty(CP.spreadsheetProperty, spreadsheetId);
+  let initialAdminPassword = "";
+  const users = readUsers_();
+  if (!users.some(u => u.role === "admin")) {
+    initialAdminPassword = randomSecret_().slice(0, 24) + "aA9!";
+    createUserRow_({
+      id: "admin-" + Utilities.getUuid(),
+      username: "admin",
+      fullName: "Administrador",
+      registration: "",
+      role: "admin",
+      password: initialAdminPassword,
+      active: true,
+      mustChange: true
+    });
   }
-
-  spreadsheet.setSpreadsheetTimeZone("America/Bahia");
-  ensureDatabaseSheets_(spreadsheet);
-
-  let apiKey = props.getProperty(CP.secretProperty);
-  if (!apiKey) {
-    apiKey = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
-    props.setProperty(CP.secretProperty, apiKey);
-  }
-
-  const origins = props.getProperty(CP.originsProperty) ||
-    "https://fersahub.github.io";
-  props.setProperty(CP.originsProperty, origins);
-
   const result = {
-    message: "Banco central preparado. Guarde a chave API em local seguro.",
-    spreadsheetUrl: spreadsheet.getUrl(),
-    spreadsheetId: spreadsheetId,
-    apiKey: apiKey,
+    message: "Backend multiusuário preparado. A planilha existente foi preservada.",
+    spreadsheetUrl: ss.getUrl(),
+    spreadsheetId: ss.getId(),
+    apiUrl: ScriptApp.getService().getUrl(),
     apiVersion: CP.version,
-    allowedOrigins: origins
+    initialAdminUsername: initialAdminPassword ? "admin" : "",
+    initialAdminPassword: initialAdminPassword || "(administrador já existente; use resetControleDePontoAdminPassword() se precisar redefinir)"
   };
-
   console.log(JSON.stringify(result, null, 2));
   return result;
 }
 
-/** Gere uma nova chave se a atual for compartilhada indevidamente. */
-function rotateControleDePontoApiKey() {
-  const apiKey = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
-  PropertiesService.getScriptProperties().setProperty(CP.secretProperty, apiKey);
-  console.log("Nova chave API gerada. Atualize a chave em todos os navegadores autorizados.");
-  return apiKey;
+/** Emite uma nova senha temporária do administrador e a mostra somente no Registro de execução. */
+function resetControleDePontoAdminPassword() {
+  const admin = readUsers_().find(u => u.role === "admin");
+  if (!admin) throw apiError_("ADMIN_NOT_FOUND", "Execute setupControleDePonto() primeiro.");
+  const password = randomSecret_().slice(0, 24) + "aA9!";
+  updateUserPassword_(admin.id, password, true);
+  console.log("Usuário: admin\nSenha temporária: " + password);
+  return password;
 }
 
-/** Endpoint simples para identificar que a implantação está ativa; não revela dados. */
 function doGet() {
-  return HtmlService.createHtmlOutput(
-    "<!doctype html><html lang='pt-BR'><meta charset='utf-8'><title>ControleDePonto API</title>" +
-    "<body style='font:16px Arial;padding:24px'><h2>ControleDePonto API</h2>" +
-    "<p>Backend ativo. As operações de dados devem ser enviadas por POST autenticado.</p></body></html>"
-  );
+  return HtmlService.createHtmlOutput("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><title>ControleDePonto API</title><body style='font:16px Arial;padding:24px'><h2>ControleDePonto API v" + CP.version + "</h2><p>Backend ativo. Entre pelo site Controle de Ponto com sua conta individual.</p></body></html>");
 }
 
-/**
- * Recebe POST via formulário oculto/iframe para contornar a ausência de CORS
- * configurável do ContentService. A resposta HTML envia o resultado por postMessage.
- */
 function doPost(e) {
   let requestId = "";
   let origin = "https://fersahub.github.io";
-
   try {
-    const raw = e && e.parameter && e.parameter.payload
-      ? e.parameter.payload
-      : (e && e.postData ? e.postData.contents : "");
-
+    const raw = e && e.parameter && e.parameter.payload ? e.parameter.payload : (e && e.postData ? e.postData.contents : "");
     if (!raw) throw apiError_("EMPTY_REQUEST", "Solicitação vazia.");
-    if (raw.length > CP.maxPayloadBytes) {
-      throw apiError_("PAYLOAD_TOO_LARGE", "A solicitação ultrapassa o limite permitido. Importe o backup em partes menores.");
-    }
-
+    if (raw.length > CP.maxPayloadBytes) throw apiError_("PAYLOAD_TOO_LARGE", "A solicitação ultrapassa o limite permitido.");
     const request = JSON.parse(raw);
     requestId = String(request.requestId || "");
     origin = String(request.origin || origin);
-
     validateOrigin_(origin);
-    validateApiKey_(request.apiKey);
     enforceRateLimit_();
-
     const result = dispatch_(request);
     return bridgeResponse_(requestId, { ok: true, data: result }, origin);
   } catch (error) {
-    const code = error && error.code ? error.code : "SERVER_ERROR";
-    const message = error && error.message ? error.message : "Falha inesperada no backend.";
-    return bridgeResponse_(requestId, { ok: false, error: { code: code, message: message } }, origin);
+    return bridgeResponse_(requestId, { ok: false, error: { code: error && error.code || "SERVER_ERROR", message: error && error.message || "Falha inesperada no backend." } }, origin);
   }
 }
 
 function dispatch_(request) {
   const action = String(request.action || "");
   const data = request.data || {};
-
+  if (action === "login") return login_(data.username, data.password);
+  if (action === "me") return publicUser_(getSession_(request.sessionToken).user);
+  if (action === "logout") return logout_(request.sessionToken);
+  const session = getSession_(request.sessionToken);
+  const user = session.user;
   switch (action) {
-    case "ping":
-      return ping_();
-    case "getAll":
-      return getAll_();
-    case "saveRecord":
-      return saveRecord_(data.record, data.force === true);
-    case "deleteRecord":
-      return deleteRecord_(data.id);
-    case "saveSchedule":
-      return saveSchedule_(data.registration, data.dailyTargetMinutes);
-    case "deleteSchedule":
-      return deleteSchedule_(data.registration);
-    case "saveShiftPlan":
-      return saveShiftPlan_(data.config);
-    case "deleteShiftPlan":
-      return deleteShiftPlan_(data.registration);
-    case "importRecords":
-      return importRecords_(data.records);
-    case "importSchedules":
-      return importSchedules_(data.schedules);
-    case "importShiftPlans":
-      return importShiftPlans_(data.shiftSchedules);
-    default:
-      throw apiError_("UNKNOWN_ACTION", "Operação não reconhecida: " + action);
+    case "ping": return ping_(user);
+    case "getAll": return getAll_(user);
+    case "saveRecord": return saveRecord_(data.record, data.force === true, user);
+    case "deleteRecord": return deleteRecord_(data.id, user);
+    case "saveSchedule": return saveSchedule_(data.registration, data.dailyTargetMinutes, user);
+    case "deleteSchedule": return deleteSchedule_(data.registration, user);
+    case "saveShiftPlan": return saveShiftPlan_(data.config, user);
+    case "deleteShiftPlan": return deleteShiftPlan_(data.registration, user);
+    case "importRecords": requireAdmin_(user); return importRecords_(data.records, user);
+    case "importSchedules": requireAdmin_(user); return importSchedules_(data.schedules, user);
+    case "importShiftPlans": requireAdmin_(user); return importShiftPlans_(data.shiftSchedules, user);
+    case "listUsers": requireAdmin_(user); return listUsers_();
+    case "createUser": requireAdmin_(user); return createEmployee_(data);
+    case "resetUserPassword": requireAdmin_(user); return resetUserPassword_(data.userId);
+    case "setUserActive": requireAdmin_(user); return setUserActive_(data.userId, data.active === true);
+    case "changePassword": return changePassword_(user, data.currentPassword, data.newPassword);
+    default: throw apiError_("UNKNOWN_ACTION", "Operação não reconhecida: " + action);
   }
 }
 
-function ping_() {
-  const spreadsheet = getSpreadsheet_();
-  const counts = {};
-  Object.keys(CP.sheets).forEach(function(key) {
-    const sheet = spreadsheet.getSheetByName(CP.sheets[key]);
-    counts[CP.sheets[key]] = Math.max(0, sheet.getLastRow() - 1);
+function login_(username, password) {
+  const key = normalizeUsername_(username);
+  if (!key || String(password || "").length < 1) throw apiError_("INVALID_CREDENTIALS", "Usuário ou senha inválidos.");
+  const cache = CacheService.getScriptCache();
+  const attemptsKey = "CP_LOGIN_" + digest_(key);
+  const attempts = Number(cache.get(attemptsKey) || 0);
+  if (attempts >= 10) throw apiError_("LOGIN_RATE_LIMIT", "Muitas tentativas. Aguarde um minuto e tente novamente.");
+  const user = readUsers_().find(u => u.username === key);
+  const valid = user && user.active && constantTimeEquals_(passwordHash_(String(password), user.salt), user.passwordHash);
+  if (!valid) {
+    cache.put(attemptsKey, String(attempts + 1), 60);
+    throw apiError_("INVALID_CREDENTIALS", "Usuário ou senha inválidos.");
+  }
+  cache.remove(attemptsKey);
+  const token = randomSecret_() + randomSecret_();
+  const created = new Date();
+  const expires = new Date(created.getTime() + CP.sessionDays * 86400000);
+  withWriteLock_(function() {
+    getSheet_(CP.sheets.sessions).appendRow([digest_(token), user.id, created.toISOString(), expires.toISOString(), ""]);
   });
-  return { connected: true, apiVersion: CP.version, counts: counts };
+  return { token: token, expiresAt: expires.toISOString(), user: publicUser_(user) };
 }
 
-function getAll_() {
-  const spreadsheet = getSpreadsheet_();
-  return {
-    records: readJsonRows_(spreadsheet.getSheetByName(CP.sheets.records), 16),
-    schedules: readMapRows_(spreadsheet.getSheetByName(CP.sheets.schedules), 1, 4),
-    shiftSchedules: readMapRows_(spreadsheet.getSheetByName(CP.sheets.shifts), 1, 10),
-    fetchedAt: new Date().toISOString(),
-    apiVersion: CP.version
-  };
+function logout_(token) {
+  const tokenHash = digest_(String(token || ""));
+  if (!tokenHash) return { loggedOut: true };
+  withWriteLock_(function() {
+    const sheet = getSheet_(CP.sheets.sessions);
+    const row = findRowByKey_(sheet, 1, tokenHash);
+    if (row) sheet.getRange(row, 5).setValue(new Date().toISOString());
+  });
+  return { loggedOut: true };
 }
 
-function saveRecord_(record, force) {
+function getSession_(token) {
+  const raw = String(token || "");
+  if (raw.length < 40) throw apiError_("UNAUTHORIZED", "Sua sessão expirou. Entre novamente.");
+  const hash = digest_(raw);
+  const sheet = getSheet_(CP.sheets.sessions);
+  const row = findRowByKey_(sheet, 1, hash);
+  if (!row) throw apiError_("UNAUTHORIZED", "Sessão não encontrada. Entre novamente.");
+  const values = sheet.getRange(row, 1, 1, 5).getDisplayValues()[0];
+  if (values[4]) throw apiError_("UNAUTHORIZED", "Esta sessão foi encerrada. Entre novamente.");
+  if (!values[3] || new Date(values[3]).getTime() <= Date.now()) throw apiError_("SESSION_EXPIRED", "Sua sessão expirou. Entre novamente.");
+  const user = readUsers_().find(u => u.id === values[1]);
+  if (!user || !user.active) throw apiError_("ACCOUNT_DISABLED", "Esta conta está desativada. Procure o administrador.");
+  return { user: user, expiresAt: values[3] };
+}
+
+function createEmployee_(data) {
+  const username = normalizeUsername_(data.username);
+  const fullName = String(data.fullName || "").trim();
+  const registration = normalizeRegistration_(data.registration);
+  if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw apiError_("INVALID_USERNAME", "O usuário deve ter de 3 a 40 caracteres: letras, números, ponto, hífen ou sublinhado.");
+  if (fullName.length < 3 || fullName.length > 120) throw apiError_("INVALID_NAME", "Informe o nome completo do funcionário.");
+  if (!registration || registration.length > 30) throw apiError_("INVALID_REGISTRATION", "Informe uma matrícula válida.");
+  const users = readUsers_();
+  if (users.some(u => u.username === username)) throw apiError_("USERNAME_EXISTS", "Este nome de usuário já está cadastrado.");
+  if (users.some(u => u.role === "employee" && u.registration === registration)) throw apiError_("REGISTRATION_EXISTS", "Esta matrícula já está vinculada a outra conta.");
+  const password = randomSecret_().slice(0, 20) + "aA9!";
+  const user = { id: "usr-" + Utilities.getUuid(), username: username, fullName: fullName, registration: registration, role: "employee", password: password, active: true, mustChange: true };
+  createUserRow_(user);
+  return { user: publicUser_(user), temporaryPassword: password };
+}
+
+function resetUserPassword_(userId) {
+  const user = readUsers_().find(u => u.id === String(userId || "") && u.role !== "admin");
+  if (!user) throw apiError_("USER_NOT_FOUND", "Funcionário não encontrado.");
+  const password = randomSecret_().slice(0, 20) + "aA9!";
+  updateUserPassword_(user.id, password, true);
+  return { userId: user.id, temporaryPassword: password };
+}
+
+function setUserActive_(userId, active) {
+  const user = readUsers_().find(u => u.id === String(userId || "") && u.role !== "admin");
+  if (!user) throw apiError_("USER_NOT_FOUND", "Funcionário não encontrado.");
+  const sheet = getSheet_(CP.sheets.users);
+  const row = findRowByKey_(sheet, 1, user.id);
+  sheet.getRange(row, 8).setValue(active ? "SIM" : "NAO");
+  if (!active) revokeUserSessions_(user.id);
+  return { userId: user.id, active: active };
+}
+
+function changePassword_(user, currentPassword, newPassword) {
+  const next = String(newPassword || "");
+  if (next.length < 10 || next.length > 100) throw apiError_("WEAK_PASSWORD", "A nova senha deve ter pelo menos 10 caracteres.");
+  if (!constantTimeEquals_(passwordHash_(String(currentPassword || ""), user.salt), user.passwordHash)) {
+    throw apiError_("INVALID_PASSWORD", "A senha atual está incorreta.");
+  }
+  updateUserPassword_(user.id, next, false);
+  return { changed: true };
+}
+
+function updateUserPassword_(userId, password, mustChange) {
+  const salt = randomSecret_();
+  const hash = passwordHash_(password, salt);
+  const sheet = getSheet_(CP.sheets.users);
+  const row = findRowByKey_(sheet, 1, userId);
+  if (!row) throw apiError_("USER_NOT_FOUND", "Usuário não encontrado.");
+  sheet.getRange(row, 6, 1, 4).setValues([[salt, hash, "SIM", mustChange ? "SIM" : "NAO"]]);
+  revokeUserSessions_(userId);
+}
+
+function revokeUserSessions_(userId) {
+  const sheet = getSheet_(CP.sheets.sessions);
+  if (sheet.getLastRow() < 2) return;
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  const now = new Date().toISOString();
+  values.forEach((row, index) => {
+    if (String(row[1]) === String(userId) && !row[4]) sheet.getRange(index + 2, 5).setValue(now);
+  });
+}
+
+function createUserRow_(user) {
+  const salt = randomSecret_();
+  const hash = passwordHash_(user.password, salt);
+  getSheet_(CP.sheets.users).appendRow([
+    user.id, user.username, user.fullName, user.registration || "", user.role,
+    salt, hash, user.active ? "SIM" : "NAO", user.mustChange ? "SIM" : "NAO", new Date().toISOString()
+  ]);
+}
+
+function readUsers_() {
+  const sheet = getSheet_(CP.sheets.users);
+  if (sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getValues().map(row => ({
+    id: String(row[0] || ""), username: String(row[1] || ""), fullName: String(row[2] || ""),
+    registration: normalizeRegistration_(row[3]), role: String(row[4] || "employee"),
+    salt: String(row[5] || ""), passwordHash: String(row[6] || ""),
+    active: String(row[7]).toUpperCase() === "SIM", mustChange: String(row[8]).toUpperCase() === "SIM",
+    createdAt: String(row[9] || "")
+  })).filter(u => u.id);
+}
+
+function listUsers_() {
+  return readUsers_().filter(u => u.role !== "admin").map(publicUser_);
+}
+
+function publicUser_(user) {
+  return { id: user.id, username: user.username, fullName: user.fullName, registration: user.registration, role: user.role, active: user.active, mustChange: user.mustChange };
+}
+
+function ping_(user) {
+  const ss = getSpreadsheet_();
+  return { connected: true, apiVersion: CP.version, role: user.role, counts: {
+    records: Math.max(0, getSheet_(CP.sheets.records).getLastRow() - 1),
+    schedules: Math.max(0, getSheet_(CP.sheets.schedules).getLastRow() - 1),
+    shifts: Math.max(0, getSheet_(CP.sheets.shifts).getLastRow() - 1)
+  } };
+}
+
+function getAll_(user) {
+  const ss = getSpreadsheet_();
+  const records = readJsonRows_(getSheet_(CP.sheets.records), 16).filter(item => canReadItem_(item, user));
+  const schedules = {};
+  readJsonRows_(getSheet_(CP.sheets.schedules), 4).filter(item => canReadItem_(item, user)).forEach(item => {
+    const key = normalizeRegistration_(item.registration);
+    if (key) schedules[key] = item.dailyTargetMinutes;
+  });
+  const shiftSchedules = {};
+  readJsonRows_(getSheet_(CP.sheets.shifts), 10).filter(item => canReadItem_(item, user)).forEach(item => {
+    const key = normalizeRegistration_(item.registration);
+    if (key) shiftSchedules[key] = item;
+  });
+  return { records: records, schedules: schedules, shiftSchedules: shiftSchedules, fetchedAt: new Date().toISOString(), apiVersion: CP.version };
+}
+
+function canReadItem_(item, user) {
+  return user.role === "admin" || String(item.ownerId || "") === user.id;
+}
+
+function saveRecord_(record, force, user) {
   validateRecord_(record);
+  const normalized = Object.assign({}, record);
+  if (user.role !== "admin") {
+    normalized.registration = user.registration;
+    normalized.fullName = user.fullName;
+    normalized.ownerId = user.id;
+  } else if (!normalized.ownerId) {
+    normalized.ownerId = ownerForRegistration_(normalized.registration) || user.id;
+  }
   return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.records);
+    const sheet = getSheet_(CP.sheets.records);
     const all = readJsonRows_(sheet, 16);
-    const existingIndex = all.findIndex(function(item) { return String(item.id) === String(record.id); });
+    const existing = all.find(item => String(item.id) === String(normalized.id));
+    if (existing && user.role !== "admin" && String(existing.ownerId || "") !== user.id) throw apiError_("FORBIDDEN", "Você não pode alterar o lançamento de outra pessoa.");
+    const sameOwner = all.filter(item => String(item.ownerId || "") === String(normalized.ownerId));
+    const duplicate = sameOwner.find(item => String(item.id) !== String(normalized.id) && recordSignature_(item) === recordSignature_(normalized));
+    if (duplicate) throw apiError_("DUPLICATE_RECORD", "Este lançamento já existe no banco central.");
+    const overlapping = sameOwner.find(item => String(item.id) !== String(normalized.id) && recordsOverlap_(item, normalized));
+    if (overlapping && !force) throw apiError_("OVERLAPPING_RECORD", "Há uma jornada sobreposta no banco central para esta matrícula. Revise os horários antes de continuar.");
     const now = new Date().toISOString();
-    const normalized = Object.assign({}, record, {
-      id: String(record.id),
-      createdAt: record.createdAt || (existingIndex >= 0 ? all[existingIndex].createdAt : now),
-      updatedAt: now
-    });
-
-    if (existingIndex < 0) {
-      const duplicate = all.find(function(item) {
-        return recordSignature_(item) === recordSignature_(normalized);
-      });
-      if (duplicate) {
-        throw apiError_("DUPLICATE_RECORD", "Este lançamento já existe no banco central (ID " + duplicate.id + ").");
-      }
-
-      const overlapping = all.find(function(item) {
-        return recordsOverlap_(item, normalized);
-      });
-      if (overlapping && !force) {
-        throw apiError_("OVERLAPPING_RECORD", "Há uma jornada sobreposta no banco central para a mesma matrícula. Revise os horários antes de continuar.");
-      }
-    }
-
+    normalized.id = String(normalized.id);
+    normalized.createdAt = normalized.createdAt || (existing && existing.createdAt) || now;
+    normalized.updatedAt = now;
     const row = recordToRow_(normalized);
-    if (existingIndex >= 0) {
-      const rowNumber = findRowByKey_(sheet, 1, normalized.id);
-      if (rowNumber) sheet.getRange(rowNumber, 1, 1, row.length).setValues([row]);
-      else sheet.appendRow(row);
-    } else {
-      sheet.appendRow(row);
-    }
-    return { saved: true, id: normalized.id, updated: existingIndex >= 0 };
+    const rowNumber = findRowByKey_(sheet, 1, normalized.id);
+    if (rowNumber) sheet.getRange(rowNumber, 1, 1, row.length).setValues([row]);
+    else sheet.appendRow(row);
+    return { saved: true, id: normalized.id, updated: Boolean(existing) };
   });
 }
 
-function deleteRecord_(id) {
+function deleteRecord_(id, user) {
   const key = String(id || "").trim();
   if (!key) throw apiError_("INVALID_ID", "ID do lançamento não informado.");
   return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.records);
+    const sheet = getSheet_(CP.sheets.records);
     const row = findRowByKey_(sheet, 1, key);
     if (!row) return { deleted: false, notFound: true };
+    const item = readJsonAtRow_(sheet, row, 16);
+    if (user.role !== "admin" && String(item.ownerId || "") !== user.id) throw apiError_("FORBIDDEN", "Você não pode excluir o lançamento de outra pessoa.");
     sheet.deleteRow(row);
     return { deleted: true, id: key };
   });
 }
 
-function saveSchedule_(registration, dailyTargetMinutes) {
-  const key = normalizeRegistration_(registration);
+function saveSchedule_(registration, dailyTargetMinutes, user) {
+  const key = user.role === "admin" ? normalizeRegistration_(registration) : user.registration;
   const minutes = Number(dailyTargetMinutes);
-  if (!key || !Number.isInteger(minutes) || minutes < 1 || minutes > 1439) {
-    throw apiError_("INVALID_SCHEDULE", "Matrícula ou jornada diária inválida.");
-  }
-  return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.schedules);
-    const value = { registration: key, dailyTargetMinutes: minutes, updatedAt: new Date().toISOString() };
-    const row = [safeSheetText_(key), minutes, value.updatedAt, JSON.stringify(value)];
-    upsertRow_(sheet, key, row);
-    return { saved: true, registration: key };
-  });
+  if (!key || !Number.isInteger(minutes) || minutes < 1 || minutes > 1439) throw apiError_("INVALID_SCHEDULE", "Matrícula ou jornada diária inválida.");
+  const value = { registration: key, dailyTargetMinutes: minutes, ownerId: user.role === "admin" ? (ownerForRegistration_(key) || user.id) : user.id, updatedAt: new Date().toISOString() };
+  withWriteLock_(function() { upsertRow_(getSheet_(CP.sheets.schedules), key, [safeSheetText_(key), minutes, value.updatedAt, JSON.stringify(value)]); });
+  return { saved: true, registration: key };
 }
 
-function deleteSchedule_(registration) {
-  const key = normalizeRegistration_(registration);
+function deleteSchedule_(registration, user) {
+  const key = user.role === "admin" ? normalizeRegistration_(registration) : user.registration;
   if (!key) throw apiError_("INVALID_REGISTRATION", "Matrícula não informada.");
   return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.schedules);
+    const sheet = getSheet_(CP.sheets.schedules);
     const row = findRowByKey_(sheet, 1, key);
-    if (row) sheet.deleteRow(row);
+    if (row) {
+      const item = readJsonAtRow_(sheet, row, 4);
+      if (user.role !== "admin" && String(item.ownerId || "") !== user.id) throw apiError_("FORBIDDEN", "Você não pode alterar a jornada de outra pessoa.");
+      sheet.deleteRow(row);
+    }
     return { deleted: Boolean(row), registration: key };
   });
 }
 
-function saveShiftPlan_(config) {
+function saveShiftPlan_(config, user) {
   if (!config || typeof config !== "object") throw apiError_("INVALID_SHIFT", "Configuração de escala inválida.");
-  const key = normalizeRegistration_(config.registration);
+  const key = user.role === "admin" ? normalizeRegistration_(config.registration) : user.registration;
   if (!key) throw apiError_("INVALID_REGISTRATION", "Matrícula não informada.");
-  const normalized = Object.assign({}, config, { registration: key, updatedAt: new Date().toISOString() });
-  const row = [
-    safeSheetText_(key), safeSheetText_(normalized.type || ""), safeSheetText_(normalized.anchorDate || ""), safeSheetText_(normalized.startTime || ""),
-    Number(normalized.durationMinutes) || 0, Number(normalized.intervalMinutes) || 0,
-    Number(normalized.workDays) || 0, Number(normalized.restDays) || 0,
-    normalized.updatedAt, JSON.stringify(normalized)
-  ];
-  return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.shifts);
-    upsertRow_(sheet, key, row);
-    return { saved: true, registration: key };
-  });
+  const normalized = Object.assign({}, config, { registration: key, ownerId: user.role === "admin" ? (ownerForRegistration_(key) || user.id) : user.id, updatedAt: new Date().toISOString() });
+  const row = [safeSheetText_(key), safeSheetText_(normalized.type || ""), safeSheetText_(normalized.anchorDate || ""), safeSheetText_(normalized.startTime || ""), Number(normalized.durationMinutes) || 0, Number(normalized.intervalMinutes) || 0, Number(normalized.workDays) || 0, Number(normalized.restDays) || 0, normalized.updatedAt, JSON.stringify(normalized)];
+  withWriteLock_(function() { upsertRow_(getSheet_(CP.sheets.shifts), key, row); });
+  return { saved: true, registration: key };
 }
 
-function deleteShiftPlan_(registration) {
-  const key = normalizeRegistration_(registration);
+function deleteShiftPlan_(registration, user) {
+  const key = user.role === "admin" ? normalizeRegistration_(registration) : user.registration;
   if (!key) throw apiError_("INVALID_REGISTRATION", "Matrícula não informada.");
   return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.shifts);
+    const sheet = getSheet_(CP.sheets.shifts);
     const row = findRowByKey_(sheet, 1, key);
-    if (row) sheet.deleteRow(row);
+    if (row) {
+      const item = readJsonAtRow_(sheet, row, 10);
+      if (user.role !== "admin" && String(item.ownerId || "") !== user.id) throw apiError_("FORBIDDEN", "Você não pode excluir a escala de outra pessoa.");
+      sheet.deleteRow(row);
+    }
     return { deleted: Boolean(row), registration: key };
   });
 }
 
-function importRecords_(items) {
-  if (!Array.isArray(items)) throw apiError_("INVALID_IMPORT", "A lista de lançamentos do backup é inválida.");
-  if (items.length > 100) throw apiError_("BATCH_TOO_LARGE", "Importe no máximo 100 lançamentos por lote.");
+function importRecords_(items, admin) {
+  if (!Array.isArray(items) || items.length > 100) throw apiError_("INVALID_IMPORT", "Importe no máximo 100 lançamentos por lote.");
   items.forEach(validateRecord_);
-
   return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.records);
+    const sheet = getSheet_(CP.sheets.records);
     const existing = readJsonRows_(sheet, 16);
-    const ids = new Set(existing.map(function(item) { return String(item.id); }));
+    const ids = new Set(existing.map(item => String(item.id)));
     const signatures = new Set(existing.map(recordSignature_));
     const rows = [];
     let skipped = 0;
-
-    items.forEach(function(item) {
+    items.forEach(item => {
       const id = String(item.id);
       const signature = recordSignature_(item);
-      if (ids.has(id) || signatures.has(signature)) {
-        skipped += 1;
-        return;
-      }
-      ids.add(id);
-      signatures.add(signature);
-      const normalized = Object.assign({}, item, {
-        id: id,
-        createdAt: item.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      rows.push(recordToRow_(normalized));
+      if (ids.has(id) || signatures.has(signature)) { skipped += 1; return; }
+      const owner = ownerForRegistration_(item.registration) || admin.id;
+      const normalized = Object.assign({}, item, { id: id, ownerId: owner, createdAt: item.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+      ids.add(id); signatures.add(signature); rows.push(recordToRow_(normalized));
     });
-
-    if (rows.length) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-    }
+    if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
     return { imported: rows.length, skipped: skipped, received: items.length };
   });
 }
 
-function importSchedules_(source) {
-  if (!source || typeof source !== "object" || Array.isArray(source)) {
-    throw apiError_("INVALID_IMPORT", "As jornadas do backup são inválidas.");
-  }
+function importSchedules_(source, admin) {
+  if (!source || typeof source !== "object" || Array.isArray(source)) throw apiError_("INVALID_IMPORT", "As jornadas do backup são inválidas.");
   const entries = Object.entries(source);
   if (entries.length > 2000) throw apiError_("BATCH_TOO_LARGE", "Quantidade de jornadas acima do limite.");
-  return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.schedules);
-    let saved = 0;
-    entries.forEach(function(entry) {
-      const key = normalizeRegistration_(entry[0]);
-      const minutes = Number(entry[1]);
-      if (!key || !Number.isInteger(minutes) || minutes < 1 || minutes > 1439) return;
-      const value = { registration: key, dailyTargetMinutes: minutes, updatedAt: new Date().toISOString() };
-      upsertRow_(sheet, key, [safeSheetText_(key), minutes, value.updatedAt, JSON.stringify(value)]);
+  let saved = 0;
+  withWriteLock_(function() {
+    const sheet = getSheet_(CP.sheets.schedules);
+    entries.forEach(([registration, minutes]) => {
+      const key = normalizeRegistration_(registration), valueMinutes = Number(minutes);
+      if (!key || !Number.isInteger(valueMinutes) || valueMinutes < 1 || valueMinutes > 1439) return;
+      const value = { registration: key, dailyTargetMinutes: valueMinutes, ownerId: ownerForRegistration_(key) || admin.id, updatedAt: new Date().toISOString() };
+      upsertRow_(sheet, key, [safeSheetText_(key), valueMinutes, value.updatedAt, JSON.stringify(value)]);
       saved += 1;
     });
-    return { saved: saved };
   });
+  return { saved: saved };
 }
 
-function importShiftPlans_(source) {
-  if (!source || typeof source !== "object" || Array.isArray(source)) {
-    throw apiError_("INVALID_IMPORT", "As escalas do backup são inválidas.");
-  }
+function importShiftPlans_(source, admin) {
+  if (!source || typeof source !== "object" || Array.isArray(source)) throw apiError_("INVALID_IMPORT", "As escalas do backup são inválidas.");
   const entries = Object.entries(source);
   if (entries.length > 2000) throw apiError_("BATCH_TOO_LARGE", "Quantidade de escalas acima do limite.");
-  return withWriteLock_(function() {
-    const sheet = getSpreadsheet_().getSheetByName(CP.sheets.shifts);
-    let saved = 0;
-    entries.forEach(function(entry) {
-      const key = normalizeRegistration_(entry[0]);
-      if (!key || !entry[1] || typeof entry[1] !== "object") return;
-      const config = Object.assign({}, entry[1], { registration: key, updatedAt: new Date().toISOString() });
-      const row = [
-        safeSheetText_(key), safeSheetText_(config.type || ""), safeSheetText_(config.anchorDate || ""), safeSheetText_(config.startTime || ""),
-        Number(config.durationMinutes) || 0, Number(config.intervalMinutes) || 0,
-        Number(config.workDays) || 0, Number(config.restDays) || 0,
-        config.updatedAt, JSON.stringify(config)
-      ];
-      upsertRow_(sheet, key, row);
-      saved += 1;
+  let saved = 0;
+  withWriteLock_(function() {
+    const sheet = getSheet_(CP.sheets.shifts);
+    entries.forEach(([registration, config]) => {
+      const key = normalizeRegistration_(registration);
+      if (!key || !config || typeof config !== "object") return;
+      const value = Object.assign({}, config, { registration: key, ownerId: ownerForRegistration_(key) || admin.id, updatedAt: new Date().toISOString() });
+      const row = [safeSheetText_(key), safeSheetText_(value.type || ""), safeSheetText_(value.anchorDate || ""), safeSheetText_(value.startTime || ""), Number(value.durationMinutes) || 0, Number(value.intervalMinutes) || 0, Number(value.workDays) || 0, Number(value.restDays) || 0, value.updatedAt, JSON.stringify(value)];
+      upsertRow_(sheet, key, row); saved += 1;
     });
-    return { saved: saved };
   });
+  return { saved: saved };
+}
+
+function ownerForRegistration_(registration) {
+  const key = normalizeRegistration_(registration);
+  const user = readUsers_().find(u => u.role === "employee" && u.active && u.registration === key);
+  return user ? user.id : "";
+}
+
+function requireAdmin_(user) {
+  if (!user || user.role !== "admin") throw apiError_("FORBIDDEN", "Esta operação é exclusiva do administrador.");
 }
 
 function validateRecord_(record) {
@@ -388,211 +469,109 @@ function validateRecord_(record) {
   if (!normalizeRegistration_(record.registration) || String(record.registration).length > 30) throw apiError_("INVALID_RECORD", "Lançamento sem matrícula válida.");
   if (!isValidIsoDate_(record.startDate)) throw apiError_("INVALID_RECORD", "Data inicial inválida.");
   if (String(record.fullName || "").length > 120) throw apiError_("INVALID_RECORD", "Nome do colaborador ultrapassa o limite permitido.");
-  const allowed = ["Plantão", "Viagem", "Intervalo", "Folga"];
-  if (!allowed.includes(String(record.serviceType || ""))) throw apiError_("INVALID_RECORD", "Tipo de serviço inválido.");
+  if (!["Plantão", "Viagem", "Intervalo", "Folga"].includes(String(record.serviceType || ""))) throw apiError_("INVALID_RECORD", "Tipo de serviço inválido.");
   if (["Plantão", "Viagem"].includes(record.serviceType)) {
-    if (!isValidClock_(record.startTime) || !isValidIsoDate_(record.endDate) || !isValidClock_(record.endTime)) {
-      throw apiError_("INVALID_RECORD", "Datas ou horários do lançamento inválidos.");
-    }
-    if (dateTimeNumber_(record.endDate, record.endTime) <= dateTimeNumber_(record.startDate, record.startTime)) {
-      throw apiError_("INVALID_RECORD", "O término precisa ser posterior ao início.");
-    }
-    if (record.serviceType === "Viagem" &&
-        (!String(record.vehicleOrder || "").trim() || !String(record.plate || "").trim() ||
-         !String(record.origin || "").trim() || !String(record.destination || "").trim())) {
-      throw apiError_("INVALID_RECORD", "Viagem exige ordem do veículo, placa, origem e destino.");
-    }
+    if (!isValidClock_(record.startTime) || !isValidIsoDate_(record.endDate) || !isValidClock_(record.endTime)) throw apiError_("INVALID_RECORD", "Datas ou horários inválidos.");
+    if (dateTimeNumber_(record.endDate, record.endTime) <= dateTimeNumber_(record.startDate, record.startTime)) throw apiError_("INVALID_RECORD", "O término precisa ser posterior ao início.");
+    if (record.serviceType === "Viagem" && (!String(record.vehicleOrder || "").trim() || !String(record.plate || "").trim() || !String(record.origin || "").trim() || !String(record.destination || "").trim())) throw apiError_("INVALID_RECORD", "Viagem exige ordem do veículo, placa, origem e destino.");
   }
 }
 
-function isValidIsoDate_(value) {
-  const text = String(value || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
-  const date = new Date(text + "T00:00:00Z");
-  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === text;
+function isValidIsoDate_(v) {
+  const s = String(v || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + "T00:00:00Z");
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
-
-function isValidClock_(value) {
-  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(value || ""));
+function isValidClock_(v) { return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(v || "")); }
+function recordToRow_(r) {
+  return [safeSheetText_(r.id),safeSheetText_(normalizeRegistration_(r.registration)),safeSheetText_(r.fullName || ""),safeSheetText_(r.startDate || ""),safeSheetText_(r.startTime || ""),safeSheetText_(r.interval || ""),safeSheetText_(r.endDate || ""),safeSheetText_(r.endTime || ""),safeSheetText_(r.vehicleOrder || ""),safeSheetText_(r.plate || ""),safeSheetText_(r.serviceType || ""),safeSheetText_(r.origin || ""),safeSheetText_(r.destination || ""),safeSheetText_(r.createdAt || ""),safeSheetText_(r.updatedAt || ""),JSON.stringify(r)];
 }
-
-function recordToRow_(record) {
-  return [
-    safeSheetText_(record.id), safeSheetText_(normalizeRegistration_(record.registration)), safeSheetText_(record.fullName || ""),
-    safeSheetText_(record.startDate || ""), safeSheetText_(record.startTime || ""), safeSheetText_(record.interval || ""),
-    safeSheetText_(record.endDate || ""), safeSheetText_(record.endTime || ""), safeSheetText_(record.vehicleOrder || ""),
-    safeSheetText_(record.plate || ""), safeSheetText_(record.serviceType || ""), safeSheetText_(record.origin || ""),
-    safeSheetText_(record.destination || ""), safeSheetText_(record.createdAt || ""), safeSheetText_(record.updatedAt || ""),
-    JSON.stringify(record)
-  ];
-}
-
-function safeSheetText_(value) {
-  const text = String(value === undefined || value === null ? "" : value);
-  return /^[=+@-]/.test(text) ? "'" + text : text;
-}
-
+function safeSheetText_(v) { const s = String(v === undefined || v === null ? "" : v); return /^[=+@-]/.test(s) ? "'" + s : s; }
 function readJsonRows_(sheet, jsonColumn) {
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const lastRow = sheet.getLastRow();
-  const values = sheet.getRange(2, 1, lastRow - 1, jsonColumn).getValues();
-  return values.map(function(row) {
-    try { return JSON.parse(String(row[jsonColumn - 1] || "{}")); }
-    catch (error) { return null; }
-  }).filter(function(item) { return item && typeof item === "object"; });
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, jsonColumn).getValues().map(row => {
+    try { return JSON.parse(String(row[jsonColumn - 1] || "{}")); } catch (_) { return null; }
+  }).filter(item => item && typeof item === "object");
 }
-
-function readMapRows_(sheet, keyColumn, jsonColumn) {
-  const result = {};
-  readJsonRows_(sheet, jsonColumn).forEach(function(item) {
-    const key = normalizeRegistration_(item.registration);
-    if (key) result[key] = item.dailyTargetMinutes !== undefined ? item.dailyTargetMinutes : item;
-  });
-  return result;
+function readJsonAtRow_(sheet, row, jsonColumn) {
+  try { return JSON.parse(String(sheet.getRange(row, jsonColumn).getValue() || "{}")); }
+  catch (_) { return {}; }
 }
-
-function ensureDatabaseSheets_(spreadsheet) {
-  const configs = [
-    [CP.sheets.records, CP.headers.records],
-    [CP.sheets.schedules, CP.headers.schedules],
-    [CP.sheets.shifts, CP.headers.shifts]
-  ];
-  configs.forEach(function(config) {
-    let sheet = spreadsheet.getSheetByName(config[0]);
-    if (!sheet) sheet = spreadsheet.insertSheet(config[0]);
-    const headers = config[1];
+function ensureDatabaseSheets_(ss) {
+  Object.keys(CP.sheets).forEach(key => {
+    const name = CP.sheets[key], headers = CP.headers[key];
+    let sheet = ss.getSheetByName(name);
+    if (!sheet) sheet = ss.insertSheet(name);
     if (sheet.getLastRow() === 0) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       sheet.setFrozenRows(1);
-      sheet.getRange(1, 1, 1, headers.length)
-        .setFontWeight("bold")
-        .setBackground("#1e314a")
-        .setFontColor("#ffffff");
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#1e314a").setFontColor("#ffffff");
       sheet.autoResizeColumns(1, headers.length);
     } else {
       const actual = sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0];
-      if (actual.join("|") !== headers.join("|")) {
-        throw apiError_("SHEET_SCHEMA_MISMATCH", "Cabeçalho inesperado na aba " + config[0] + ". Não alterei os dados existentes.");
-      }
+      if (actual.join("|") !== headers.join("|")) throw apiError_("SHEET_SCHEMA_MISMATCH", "Cabeçalho inesperado na aba " + name + ". Os dados existentes foram preservados.");
     }
   });
-
-  const defaultSheet = spreadsheet.getSheetByName("Sheet1");
-  if (defaultSheet && spreadsheet.getSheets().length > configs.length && defaultSheet.getLastRow() === 0) {
-    spreadsheet.deleteSheet(defaultSheet);
-  }
+  const defaultSheet = ss.getSheetByName("Sheet1");
+  if (defaultSheet && ss.getSheets().length > Object.keys(CP.sheets).length && defaultSheet.getLastRow() === 0) ss.deleteSheet(defaultSheet);
 }
-
 function getSpreadsheet_() {
   const id = PropertiesService.getScriptProperties().getProperty(CP.spreadsheetProperty);
-  if (!id) throw apiError_("NOT_INITIALIZED", "Execute setupControleDePonto() no editor do Apps Script antes de usar a API.");
+  if (!id) throw apiError_("NOT_INITIALIZED", "Execute setupControleDePonto() no editor do Apps Script.");
   return SpreadsheetApp.openById(id);
 }
-
+function getSheet_(name) {
+  const sheet = getSpreadsheet_().getSheetByName(name);
+  if (!sheet) throw apiError_("SHEET_MISSING", "A aba " + name + " não foi encontrada. Execute setupControleDePonto().");
+  return sheet;
+}
 function findRowByKey_(sheet, column, key) {
   if (!sheet || sheet.getLastRow() < 2) return 0;
   const values = sheet.getRange(2, column, sheet.getLastRow() - 1, 1).getDisplayValues();
-  const index = values.findIndex(function(row) { return String(row[0]) === String(key); });
+  const index = values.findIndex(row => String(row[0]) === String(key));
   return index < 0 ? 0 : index + 2;
 }
-
 function upsertRow_(sheet, key, row) {
   const rowNumber = findRowByKey_(sheet, 1, key);
   if (rowNumber) sheet.getRange(rowNumber, 1, 1, row.length).setValues([row]);
   else sheet.appendRow(row);
 }
-
-function recordSignature_(record) {
-  return [
-    normalizeRegistration_(record.registration), record.serviceType || "",
-    record.startDate || "", record.startTime || "", record.endDate || "",
-    record.endTime || "", String(record.interval || ""),
-    String(record.vehicleOrder || "").trim().toUpperCase(),
-    String(record.plate || "").trim().toUpperCase(),
-    String(record.origin || "").trim().toUpperCase(),
-    String(record.destination || "").trim().toUpperCase()
-  ].join("|");
+function recordSignature_(r) {
+  return [normalizeRegistration_(r.registration),r.serviceType || "",r.startDate || "",r.startTime || "",r.endDate || "",r.endTime || "",String(r.interval || ""),String(r.vehicleOrder || "").trim().toUpperCase(),String(r.plate || "").trim().toUpperCase(),String(r.origin || "").trim().toUpperCase(),String(r.destination || "").trim().toUpperCase()].join("|");
 }
-
-function recordsOverlap_(a, b) {
+function recordsOverlap_(a,b) {
   if (!a || !b || normalizeRegistration_(a.registration) !== normalizeRegistration_(b.registration)) return false;
-  if (!["Plantão", "Viagem"].includes(a.serviceType) || !["Plantão", "Viagem"].includes(b.serviceType)) return false;
-  const aStart = dateTimeNumber_(a.startDate, a.startTime);
-  const aEnd = dateTimeNumber_(a.endDate, a.endTime);
-  const bStart = dateTimeNumber_(b.startDate, b.startTime);
-  const bEnd = dateTimeNumber_(b.endDate, b.endTime);
-  return [aStart, aEnd, bStart, bEnd].every(Number.isFinite) && aStart < bEnd && bStart < aEnd;
+  if (!["Plantão","Viagem"].includes(a.serviceType) || !["Plantão","Viagem"].includes(b.serviceType)) return false;
+  const as = dateTimeNumber_(a.startDate,a.startTime), ae = dateTimeNumber_(a.endDate,a.endTime), bs = dateTimeNumber_(b.startDate,b.startTime), be = dateTimeNumber_(b.endDate,b.endTime);
+  return [as,ae,bs,be].every(Number.isFinite) && as < be && bs < ae;
 }
-
-function dateTimeNumber_(date, time) {
-  const stamp = Date.parse(String(date || "") + "T" + String(time || "") + ":00-03:00");
-  return Number.isFinite(stamp) ? stamp : NaN;
-}
-
-function normalizeRegistration_(value) {
-  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
-}
-
-function withWriteLock_(callback) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try { return callback(); }
-  finally { lock.releaseLock(); }
-}
-
-
+function dateTimeNumber_(date,time) { const stamp = Date.parse(String(date || "") + "T" + String(time || "") + ":00-03:00"); return Number.isFinite(stamp) ? stamp : NaN; }
+function normalizeRegistration_(v) { return String(v || "").trim().toUpperCase().replace(/\s+/g,""); }
+function normalizeUsername_(v) { return String(v || "").trim().toLowerCase(); }
+function withWriteLock_(fn) { const lock = LockService.getScriptLock(); lock.waitLock(20000); try { return fn(); } finally { lock.releaseLock(); } }
 function enforceRateLimit_() {
-  const cache = CacheService.getScriptCache();
-  const key = "CP_REQUESTS_PER_MINUTE";
-  const count = Number(cache.get(key) || 0) + 1;
-  if (count > 180) throw apiError_("RATE_LIMIT", "Muitas solicitações em sequência. Aguarde um minuto e tente novamente.");
-  cache.put(key, String(count), 60);
+  const cache = CacheService.getScriptCache(), key = "CP_PUBLIC_REQUESTS", n = Number(cache.get(key) || 0) + 1;
+  if (n > 240) throw apiError_("RATE_LIMIT", "Muitas solicitações em sequência. Tente novamente em um minuto.");
+  cache.put(key, String(n), 60);
 }
-
-function validateApiKey_(candidate) {
-  const expected = PropertiesService.getScriptProperties().getProperty(CP.secretProperty);
-  if (!expected) throw apiError_("NOT_INITIALIZED", "Execute setupControleDePonto() antes de utilizar o backend.");
-  const left = String(candidate || "");
-  if (!constantTimeEquals_(left, expected)) throw apiError_("UNAUTHORIZED", "Código de acesso ao banco inválido ou ausente.");
+function randomSecret_() { return Utilities.getUuid().replace(/-/g,"") + Utilities.getUuid().replace(/-/g,""); }
+function digest_(s) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)); }
+function passwordHash_(password, salt) {
+  const pepper = PropertiesService.getScriptProperties().getProperty(CP.pepperProperty);
+  if (!pepper) throw apiError_("NOT_INITIALIZED", "Execute setupControleDePonto() para inicializar o backend.");
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(String(password) + "|" + salt, pepper, Utilities.Charset.UTF_8));
 }
-
-function constantTimeEquals_(left, right) {
-  if (left.length !== right.length) return false;
-  let diff = 0;
-  for (let i = 0; i < left.length; i += 1) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
-  return diff === 0;
-}
-
+function constantTimeEquals_(a,b) { a=String(a || ""); b=String(b || ""); if (a.length !== b.length) return false; let diff=0; for (let i=0;i<a.length;i++) diff |= a.charCodeAt(i)^b.charCodeAt(i); return diff===0; }
 function validateOrigin_(origin) {
   const configured = PropertiesService.getScriptProperties().getProperty(CP.originsProperty) || "https://fersahub.github.io";
-  const allowed = configured.split(",").map(function(item) { return item.trim(); }).filter(Boolean);
-  if (allowed.indexOf(origin) < 0) throw apiError_("ORIGIN_NOT_ALLOWED", "Origem não autorizada para esta implantação.");
+  const allowed = configured.split(",").map(s=>s.trim()).filter(Boolean);
+  if (allowed.indexOf(origin) < 0) throw apiError_("ORIGIN_NOT_ALLOWED", "Origem não autorizada.");
 }
-
-function bridgeResponse_(requestId, response, origin) {
-  const message = safeJson_({
-    channel: "CONTROLE_PONTO_SHEETS",
-    requestId: String(requestId || ""),
-    response: response
-  });
-  const html = "<!doctype html><html><head><meta charset='utf-8'></head><body><script>" +
-    "window.top.postMessage(" + message + "," + safeJson_(origin) + ");" +
-    "</script></body></html>";
-  return HtmlService.createHtmlOutput(html)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function bridgeResponse_(requestId,response,origin) {
+  const message = safeJson_({channel:"CONTROLE_PONTO_SHEETS",requestId:String(requestId || ""),response:response});
+  const html = "<!doctype html><html><head><meta charset='utf-8'></head><body><script>window.top.postMessage(" + message + "," + safeJson_(origin) + ");</script></body></html>";
+  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
-
-function safeJson_(value) {
-  return JSON.stringify(value)
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
-}
-
-function apiError_(code, message) {
-  const error = new Error(message);
-  error.code = code;
-  return error;
-}
+function safeJson_(v) { return JSON.stringify(v).replace(/</g,"\\u003c").replace(/>/g,"\\u003e").replace(/&/g,"\\u0026").replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029"); }
+function apiError_(code,message) { const e=new Error(message); e.code=code; return e; }
