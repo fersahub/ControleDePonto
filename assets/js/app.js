@@ -546,6 +546,7 @@
       ? "Esta é uma senha temporária. Você precisa criar uma senha pessoal antes de continuar."
       : "Use uma senha pessoal com pelo menos 10 caracteres.";
     document.getElementById("changePasswordForm").classList.toggle("password-change-required", Boolean(user.mustChange));
+    if (user.mustChange && window.ControlPointNavigation) window.ControlPointNavigation.open("tab-account");
   }
 
   async function connectCloudDatabase(automatic) {
