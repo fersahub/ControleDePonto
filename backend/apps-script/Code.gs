@@ -191,6 +191,7 @@ function createEmployee_(data) {
   const password = randomSecret_().slice(0, 20) + "aA9!";
   const user = { id: "usr-" + Utilities.getUuid(), username: username, fullName: fullName, registration: registration, role: "employee", password: password, active: true, mustChange: true };
   createUserRow_(user);
+  assignLegacyDataToUser_(registration, user.id);
   return { user: publicUser_(user), temporaryPassword: password };
 }
 
@@ -218,11 +219,12 @@ function changePassword_(user, currentPassword, newPassword) {
   if (!constantTimeEquals_(passwordHash_(String(currentPassword || ""), user.salt), user.passwordHash)) {
     throw apiError_("INVALID_PASSWORD", "A senha atual está incorreta.");
   }
-  updateUserPassword_(user.id, next, false);
-  return { changed: true };
+  updateUserPassword_(user.id, next, false, false);
+  user.mustChange = false;
+  return { changed: true, user: publicUser_(user) };
 }
 
-function updateUserPassword_(userId, password, mustChange) {
+function updateUserPassword_(userId, password, mustChange, revokeSessions) {
   const salt = randomSecret_();
   const hash = passwordHash_(password, salt);
   const sheet = getSheet_(CP.sheets.users);
@@ -231,7 +233,25 @@ function updateUserPassword_(userId, password, mustChange) {
   sheet.getRange(row, 6).setValue(salt);
   sheet.getRange(row, 7).setValue(hash);
   sheet.getRange(row, 9).setValue(mustChange ? "SIM" : "NAO");
-  revokeUserSessions_(userId);
+  if (revokeSessions !== false) revokeUserSessions_(userId);
+}
+
+function assignLegacyDataToUser_(registration, userId) {
+  const key = normalizeRegistration_(registration);
+  [ [CP.sheets.records, 16], [CP.sheets.schedules, 4], [CP.sheets.shifts, 10] ].forEach(([name, col]) => {
+    const sheet = getSheet_(name);
+    if (sheet.getLastRow() < 2) return;
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, col).getValues();
+    rows.forEach((row, index) => {
+      try {
+        const item = JSON.parse(String(row[col - 1] || "{}"));
+        if (normalizeRegistration_(item.registration) === key && !item.ownerId) {
+          item.ownerId = userId;
+          sheet.getRange(index + 2, col).setValue(JSON.stringify(item));
+        }
+      } catch (_) {}
+    });
+  });
 }
 
 function revokeUserSessions_(userId) {
