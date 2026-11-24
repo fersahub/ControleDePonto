@@ -57,7 +57,7 @@ async function run() {
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
     await page.goto(url, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector("#timeForm");
+    await page.waitForSelector("#timeForm", { state: "attached" });
     await page.waitForSelector("body.auth-ready");
     check(await page.title() === "Meu Controle de Jornada", "Título da versão pessoal");
     check(await page.locator("#schedulePreset").count() === 1, "Seção de jornada personalizada visível");
