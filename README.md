@@ -111,36 +111,30 @@ A projeção considera entrada, duração do turno e intervalo planejado. O cale
 As escalas ficam no armazenamento local e entram nos backups versão 2. O aplicativo continua aceitando backups anteriores versão 1. O planejamento não altera lançamentos, a jornada diária personalizada nem o cálculo atual de horas extras. A apuração continua diária, conforme a carga configurada em **Minha jornada personalizada**; o planejador não calcula limites semanais, DSR, adicional noturno, feriados ou regras legais/convenções.
 
 
-## Banco central Google Sheets
+## Banco central Google Sheets com contas individuais
 
-O projeto inclui um backend em `backend/apps-script/Code.gs` e um cliente de integração em `assets/js/sheets-client.js`.
+O sistema utiliza o Google Apps Script como backend e o Google Sheets como banco central. O acesso é individual, com papéis de administrador e funcionário, sessão autenticada e autorização aplicada no servidor.
 
-### Configuração inicial
+### Como funciona
 
-Consulte o passo a passo em [backend/README.md](backend/README.md). Em resumo:
+- O administrador mantém a planilha e cria contas para os funcionários.
+- Cada funcionário entra com seu usuário e senha, sem precisar inserir URL do Apps Script ou chave compartilhada no próprio navegador.
+- Os lançamentos novos são enviados automaticamente ao banco central após a confirmação.
+- O funcionário consulta apenas seus próprios registros, jornada e escala. O servidor também bloqueia alterações e exclusões de registros de outras pessoas.
+- O administrador consulta a base geral, cria/desativa contas, redefine senhas e importa backups antigos.
+- As contas usam matrícula única e as senhas temporárias precisam ser trocadas no primeiro acesso.
+- A sessão é mantida por até 14 dias; depois disso, basta entrar novamente.
 
-1. Criar um projeto Google Apps Script e copiar `backend/apps-script/Code.gs`.
-2. Configurar o manifesto usando `backend/apps-script/appsscript.json`.
-3. Executar `setupControleDePonto()` para criar a planilha e as abas `LANCAMENTOS`, `JORNADAS` e `ESCALAS`.
-4. Criar uma implantação de Aplicativo da Web e copiar a URL terminada em `/exec`.
-5. No site, informar a URL e a chave API compartilhada no painel **Banco central (Google Sheets)**.
+### Ativação do backend atualizado
 
-### Sincronização e migração de dados locais
+Consulte [backend/README.md](backend/README.md). A planilha já usada é reaproveitada; não crie outra. O código novo acrescenta as abas USUARIOS e SESSOES, mantendo as abas de dados existentes.
 
-- O site continua mantendo uma cópia no navegador para uso offline e contingência.
-- Quando conectado, novos lançamentos, jornadas e escalas são enviados ao backend.
-- **Enviar dados locais para o banco** transfere a cópia atual do navegador sem apagar dados da planilha.
-- **Baixar backup completo** gera o JSON usado para transportar dados de outros navegadores.
-- **Importar backup local para o banco central** permite carregar esse JSON para a base geral. A importação faz mesclagem: IDs ou assinaturas de lançamentos já existentes são ignorados; jornadas e escalas são atualizadas pela matrícula.
-- A importação pode ser repetida. Se uma transferência for interrompida, os lotes concluídos não serão inseridos novamente ao repetir.
-- Atualizar o banco central mescla os registros recebidos à cópia local; não substitui o armazenamento local por um conjunto menor.
+Depois de atualizar e implantar o Apps Script, o endereço /exec é definido uma única vez em assets/js/backend-config.js. Esse endereço não é uma senha e fica igual para todos os navegadores. Nenhum código de acesso compartilhado é entregue aos funcionários.
 
-### Limite de acesso nesta etapa
+### Migração de dados
 
-Esta entrega não implementa login individual. O backend usa uma chave de acesso compartilhada armazenada nas propriedades privadas do Apps Script e solicitada no painel do site. Qualquer pessoa que possua essa chave pode consultar e alterar a base compartilhada inteira. Não há isolamento de dados por usuário; por isso, distribua a chave somente a pessoas autorizadas a acessar todos os registros. A planilha deve permanecer privada e não ser compartilhada diretamente com usuários do site.
+A base anterior é preservada. Quando uma conta de funcionário é criada, registros antigos sem proprietário vinculados à matrícula correspondente passam a pertencer àquela conta. O administrador também pode importar backups JSON antigos pela área de administração; registros existentes são deduplicados e não são apagados.
 
-A autenticação individual, o cadastro de usuários e a separação de registros por pessoa permanecem fora do escopo atual e precisarão ser implementados antes de oferecer dados individuais a vários usuários.
+### Segurança e limites
 
-### Limites
-
-O Google Apps Script tem cotas e limites de execução que podem mudar. A planilha é adequada para uma operação inicial de volume modesto, mas não substitui um banco de dados transacional de alta concorrência. Consulte: https://developers.google.com/apps-script/guides/services/quotas
+A autorização de cada operação é verificada no Apps Script, não apenas na interface. A planilha deve permanecer privada no Google Drive e não deve ser compartilhada diretamente com os funcionários. O endpoint é público, mas os dados exigem uma sessão individual válida. O Google Apps Script/Sheets atende uma operação inicial de volume moderado e possui cotas e limites de execução; consulte https://developers.google.com/apps-script/guides/services/quotas.
