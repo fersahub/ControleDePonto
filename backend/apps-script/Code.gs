@@ -576,7 +576,7 @@ function bridgeResponse_(requestId, response, origin) {
     response: response
   });
   const html = "<!doctype html><html><head><meta charset='utf-8'></head><body><script>" +
-    "window.parent.postMessage(" + message + "," + safeJson_(origin) + ");" +
+    "window.top.postMessage(" + message + "," + safeJson_(origin) + ");" +
     "</script></body></html>";
   return HtmlService.createHtmlOutput(html)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
