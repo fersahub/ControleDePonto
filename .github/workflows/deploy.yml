@@ -6,6 +6,7 @@ on:
     paths:
       - "index.html"
       - "assets/**"
+      - "backend/**"
       - ".github/workflows/deploy.yml"
       - "README.md"
       - "manifest.webmanifest"
@@ -33,7 +34,9 @@ jobs:
         run: |
           node --check assets/js/time-engine.js
           node --check assets/js/schedule-engine.js
+          node --check assets/js/sheets-client.js
           node --check assets/js/app.js
+          node --check < backend/apps-script/Code.gs
       - name: Teste estrutural do site
         run: node tests/smoke-test.js
       - name: Testes de cálculos e jornadas
