@@ -35,6 +35,17 @@
   const activityCalendarGrid = document.getElementById("activityCalendarGrid");
   let activitySelectedDate = "";
 
+  const cloudEndpointInput = document.getElementById("cloudEndpoint");
+  const cloudAccessCodeInput = document.getElementById("cloudAccessCode");
+  const cloudDbStatus = document.getElementById("cloudDbStatus");
+  const refreshCloudButton = document.getElementById("refreshCloudButton");
+  const syncLocalDataButton = document.getElementById("syncLocalDataButton");
+  const cloudBackupFileInput = document.getElementById("cloudBackupFileInput");
+  const cloudBackupPreview = document.getElementById("cloudBackupPreview");
+  const importCloudBackupButton = document.getElementById("importCloudBackupButton");
+  let cloudConnected = false;
+  let pendingCloudBackup = null;
+
   let records = loadRecords();
 
   function loadRecords() {
@@ -240,7 +251,7 @@
     }
   }
 
-  function saveShiftPlan() {
+  async function saveShiftPlan() {
     const feedbackElement = document.getElementById("shiftScheduleFeedback");
     let config;
     try { config = readShiftPlanForm(); }
@@ -255,10 +266,19 @@
     renderShiftScheduleOptions();
     renderShiftCalendar();
     renderDashboardExtras();
-    feedbackElement.textContent = "Escala " + ScheduleEngine.typeLabel(config.type) + " salva para a matrícula " + config.registration + ". Os lançamentos e o cálculo atual de horas extras não foram alterados.";
+    if (cloudConnected) {
+      try {
+        await syncShiftPlanToCloud(config);
+        feedbackElement.textContent = "Escala " + ScheduleEngine.typeLabel(config.type) + " salva localmente e no banco central para a matrícula " + config.registration + ".";
+      } catch (error) {
+        feedbackElement.textContent = "Escala salva localmente, mas não sincronizada: " + error.message + ". Use Enviar dados locais para o banco.";
+      }
+    } else {
+      feedbackElement.textContent = "Escala " + ScheduleEngine.typeLabel(config.type) + " salva neste navegador para a matrícula " + config.registration + ".";
+    }
   }
 
-  function deleteShiftPlan() {
+  async function deleteShiftPlan() {
     const feedbackElement = document.getElementById("shiftScheduleFeedback");
     const registration = normalizeRegistration(document.getElementById("shiftScheduleRegistration").value) ||
       document.getElementById("savedShiftScheduleSelect").value;
@@ -267,6 +287,10 @@
       return;
     }
     if (!window.confirm("Excluir a escala da matrícula " + registration + "? Os lançamentos existentes serão preservados.")) return;
+    if (cloudConnected) {
+      try { await SheetsBackend.request("deleteShiftPlan", { registration: registration }); }
+      catch (error) { feedbackElement.textContent = "Não foi possível excluir a escala no banco central: " + error.message; return; }
+    }
     const previous = shiftPlans[registration];
     delete shiftPlans[registration];
     if (!persistShiftPlans()) { shiftPlans[registration] = previous; return; }
@@ -423,6 +447,238 @@
       showFeedback("Não foi possível salvar neste navegador. Verifique o espaço disponível ou as permissões de armazenamento.", "error");
       console.error(error);
       return false;
+    }
+  }
+
+  function updateCloudStatus(message, kind) {
+    if (!cloudDbStatus) return;
+    cloudDbStatus.textContent = message;
+    cloudDbStatus.classList.toggle("is-connected", kind === "success");
+    cloudDbStatus.classList.toggle("is-error", kind === "error");
+  }
+
+  function mergeById(localItems, remoteItems) {
+    const merged = new Map();
+    (Array.isArray(localItems) ? localItems : []).forEach((item) => {
+      if (item && item.id) merged.set(String(item.id), item);
+    });
+    (Array.isArray(remoteItems) ? remoteItems : []).forEach((item) => {
+      if (item && item.id) merged.set(String(item.id), item);
+    });
+    return [...merged.values()];
+  }
+
+  async function refreshCloudDatabase() {
+    if (!cloudConnected) throw new Error("Conecte-se ao banco central antes de atualizar os dados.");
+    const data = await SheetsBackend.request("getAll", {});
+    if (!data || !Array.isArray(data.records)) throw new Error("O banco central retornou uma resposta incompleta.");
+
+    records = mergeById(records, data.records);
+    Object.entries(data.schedules || {}).forEach(([registration, minutes]) => {
+      const key = normalizeRegistration(registration);
+      const value = Number(minutes);
+      if (key && Number.isInteger(value) && value > 0 && value < 1440) schedules[key] = value;
+    });
+    Object.entries(data.shiftSchedules || {}).forEach(([registration, config]) => {
+      const key = normalizeRegistration(registration);
+      if (!key || !config || typeof config !== "object") return;
+      try { shiftPlans[key] = ScheduleEngine.normalizeConfig(config, key); }
+      catch (error) { console.warn("Escala do banco ignorada para " + key + ".", error); }
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    localStorage.setItem(SCHEDULES_KEY, JSON.stringify(schedules));
+    localStorage.setItem(SHIFT_PLANS_KEY, JSON.stringify(shiftPlans));
+    renderShiftScheduleOptions();
+    renderRecords();
+    refreshScheduleForm();
+    renderShiftCalendar();
+    renderDashboardExtras();
+    return { records: data.records.length, schedules: Object.keys(data.schedules || {}).length, shifts: Object.keys(data.shiftSchedules || {}).length };
+  }
+
+  async function connectCloudDatabase(automatic) {
+    try {
+      if (!window.SheetsBackend) throw new Error("O módulo de conexão com Google Sheets não foi carregado.");
+      if (automatic) {
+        if (!SheetsBackend.isConfigured()) return;
+      } else {
+        SheetsBackend.configure(cloudEndpointInput.value, cloudAccessCodeInput.value);
+      }
+      updateCloudStatus("Verificando a conexão com o Google Apps Script...", "");
+      const ping = await SheetsBackend.request("ping", {});
+      if (!ping || !ping.connected) throw new Error("O backend respondeu, mas não confirmou a conexão com a planilha.");
+      cloudConnected = true;
+      refreshCloudButton.disabled = false;
+      syncLocalDataButton.disabled = false;
+      const counts = await refreshCloudDatabase();
+      updateCloudStatus(
+        "Conectado ao banco central. " + counts.records + " lançamentos, " +
+        counts.schedules + " jornadas e " + counts.shifts + " escalas recebidos. " +
+        "Os dados locais ainda não enviados podem ser transferidos pelos botões abaixo.",
+        "success"
+      );
+      cloudEndpointInput.value = SheetsBackend.getEndpoint();
+      return true;
+    } catch (error) {
+      cloudConnected = false;
+      refreshCloudButton.disabled = true;
+      syncLocalDataButton.disabled = true;
+      updateCloudStatus(error.message || "Não foi possível conectar ao banco central.", "error");
+      return false;
+    }
+  }
+
+  async function syncRecordToCloud(record) {
+    if (!cloudConnected) return false;
+    try {
+      await SheetsBackend.request("saveRecord", { record: record, force: false });
+      return true;
+    } catch (error) {
+      if (error.code === "OVERLAPPING_RECORD" &&
+          window.confirm(error.message + "\n\nDeseja confirmar mesmo assim e gravar no banco central?")) {
+        await SheetsBackend.request("saveRecord", { record: record, force: true });
+        return true;
+      }
+      throw error;
+    }
+  }
+
+  async function syncScheduleToCloud(registration, minutes) {
+    if (!cloudConnected) return false;
+    await SheetsBackend.request("saveSchedule", { registration: registration, dailyTargetMinutes: minutes });
+    return true;
+  }
+
+  async function syncShiftPlanToCloud(config) {
+    if (!cloudConnected) return false;
+    await SheetsBackend.request("saveShiftPlan", { config: config });
+    return true;
+  }
+
+  async function pushDataToCloud(sourceRecords, sourceSchedules, sourceShiftPlans) {
+    if (!cloudConnected) throw new Error("Conecte-se ao banco central antes de enviar dados.");
+    let imported = 0;
+    let skipped = 0;
+    const items = Array.isArray(sourceRecords) ? sourceRecords : [];
+    for (let index = 0; index < items.length; index += 50) {
+      const result = await SheetsBackend.request("importRecords", { records: items.slice(index, index + 50) });
+      imported += Number(result.imported) || 0;
+      skipped += Number(result.skipped) || 0;
+    }
+    const scheduleResult = await SheetsBackend.request("importSchedules", { schedules: sourceSchedules || {} });
+    const shiftResult = await SheetsBackend.request("importShiftPlans", { shiftSchedules: sourceShiftPlans || {} });
+    return {
+      imported: imported,
+      skipped: skipped,
+      schedules: Number(scheduleResult.saved) || 0,
+      shifts: Number(shiftResult.saved) || 0
+    };
+  }
+
+  async function sendLocalDataToCloud() {
+    if (!cloudConnected) {
+      updateCloudStatus("Conecte-se ao banco central antes de enviar os dados locais.", "error");
+      return;
+    }
+    if (!window.confirm(
+      "Enviar para a planilha central os " + records.length + " lançamento(s), " +
+      Object.keys(schedules).length + " jornada(s) e " + Object.keys(shiftPlans).length +
+      " escala(s) atualmente salvos neste navegador?\n\nA operação acrescenta lançamentos ausentes e atualiza jornadas/escalas pela matrícula. Não apaga dados da planilha."
+    )) return;
+    syncLocalDataButton.disabled = true;
+    updateCloudStatus("Enviando os dados locais para a planilha...", "");
+    try {
+      const result = await pushDataToCloud(records, schedules, shiftPlans);
+      const counts = await refreshCloudDatabase();
+      updateCloudStatus(
+        "Envio concluído: " + result.imported + " lançamento(s) novo(s), " +
+        result.skipped + " já existente(s), " + result.schedules +
+        " jornada(s) e " + result.shifts + " escala(s) processadas. A base agora contém " +
+        counts.records + " lançamentos.",
+        "success"
+      );
+    } catch (error) {
+      updateCloudStatus("O envio não foi concluído por completo. Os dados locais foram preservados. Você pode repetir a operação: " + error.message, "error");
+    } finally {
+      syncLocalDataButton.disabled = false;
+    }
+  }
+
+  async function selectCloudBackup(event) {
+    const file = event.target.files && event.target.files[0];
+    pendingCloudBackup = null;
+    importCloudBackupButton.disabled = true;
+    if (!file) {
+      cloudBackupPreview.textContent = "Nenhum backup selecionado.";
+      return;
+    }
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("O arquivo ultrapassa o limite de 10 MB.");
+      const backup = JSON.parse(await file.text());
+      if (!backup || backup.application !== "controle-de-ponto" ||
+          ![1, 2].includes(backup.backupVersion) || !Array.isArray(backup.records) ||
+          !backup.schedules || typeof backup.schedules !== "object" || Array.isArray(backup.schedules)) {
+        throw new Error("Este arquivo não é um backup válido do ControleDePonto.");
+      }
+      const normalized = normalizeBackupRecords(backup.records);
+      if (backup.records.length && !normalized.records.length) throw new Error("Nenhum lançamento válido foi encontrado no backup.");
+      const restoredSchedules = {};
+      Object.entries(backup.schedules).forEach(([registration, minutes]) => {
+        const key = normalizeRegistration(registration);
+        const value = Number(minutes);
+        if (key && Number.isInteger(value) && value > 0 && value < 1440) restoredSchedules[key] = value;
+      });
+      const restoredShiftPlans = normalizeBackupShiftPlans(backup.shiftSchedules || {});
+      pendingCloudBackup = {
+        records: normalized.records,
+        rejected: normalized.rejected,
+        schedules: restoredSchedules,
+        shiftSchedules: restoredShiftPlans
+      };
+      cloudBackupPreview.textContent =
+        normalized.records.length + " lançamento(s) válido(s), " +
+        Object.keys(restoredSchedules).length + " jornada(s), " +
+        Object.keys(restoredShiftPlans).length + " escala(s)." +
+        (normalized.rejected ? " " + normalized.rejected + " lançamento(s) inválido(s) serão ignorados." : "") +
+        " A importação mescla os dados e não substitui a planilha.";
+      importCloudBackupButton.disabled = false;
+    } catch (error) {
+      cloudBackupPreview.textContent = error.message || "Não foi possível ler o backup.";
+      updateCloudStatus(error.message || "Backup inválido.", "error");
+    }
+  }
+
+  async function importCloudBackup() {
+    if (!cloudConnected) {
+      updateCloudStatus("Conecte-se ao banco central antes de importar o backup.", "error");
+      return;
+    }
+    if (!pendingCloudBackup) return;
+    const backup = pendingCloudBackup;
+    if (!window.confirm(
+      "Importar " + backup.records.length + " lançamento(s), " +
+      Object.keys(backup.schedules).length + " jornada(s) e " +
+      Object.keys(backup.shiftSchedules).length + " escala(s) para o banco central?\n\n" +
+      "A operação não apaga lançamentos da planilha. IDs ou lançamentos equivalentes já existentes serão ignorados. Jornadas e escalas da mesma matrícula serão atualizadas."
+    )) return;
+
+    importCloudBackupButton.disabled = true;
+    updateCloudStatus("Importando backup para o banco central...", "");
+    try {
+      const result = await pushDataToCloud(backup.records, backup.schedules, backup.shiftSchedules);
+      const counts = await refreshCloudDatabase();
+      updateCloudStatus(
+        "Backup importado: " + result.imported + " lançamento(s) novo(s), " +
+        result.skipped + " já existente(s), " + result.schedules +
+        " jornada(s) e " + result.shifts + " escala(s) processadas. " +
+        counts.records + " lançamentos estão agora carregados neste navegador.",
+        "success"
+      );
+      cloudBackupPreview.textContent = "Importação concluída. " + result.imported + " lançamento(s) adicionados e " + result.skipped + " ignorados por já existirem.";
+    } catch (error) {
+      updateCloudStatus("A importação pode ter sido parcial. Os lotes já concluídos não serão duplicados ao repetir: " + error.message, "error");
+      importCloudBackupButton.disabled = false;
     }
   }
 
@@ -1600,7 +1856,7 @@
 
   window.addEventListener("afterprint", () => document.body.classList.remove("printing-individual-report"));
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     clearFeedback();
 
@@ -1626,7 +1882,16 @@
 
     renderRecords();
     form.reset();
-    window.setTimeout(() => showFeedback("Lançamento salvo com sucesso neste navegador.", "success"), 0);
+    if (cloudConnected) {
+      try {
+        await syncRecordToCloud(record);
+        window.setTimeout(() => showFeedback("Lançamento salvo neste navegador e sincronizado com o banco central.", "success"), 0);
+      } catch (error) {
+        window.setTimeout(() => showFeedback("Lançamento salvo localmente, mas não foi sincronizado com o banco central: " + error.message + " Use “Enviar dados locais para o banco” para tentar novamente.", "error"), 0);
+      }
+    } else {
+      window.setTimeout(() => showFeedback("Lançamento salvo neste navegador. Conecte o banco central para sincronizar.", "success"), 0);
+    }
   });
 
   form.addEventListener("reset", () => {
@@ -1641,7 +1906,7 @@
 
   schedulePreset.addEventListener("change", () => customScheduleField.classList.toggle("is-hidden", schedulePreset.value !== "custom"));
   scheduleRegistrationInput.addEventListener("input", refreshScheduleForm);
-  document.getElementById("saveScheduleButton").addEventListener("click", () => {
+  document.getElementById("saveScheduleButton").addEventListener("click", async () => {
     const key = normalizeRegistration(scheduleRegistrationInput.value);
     if (!key) { scheduleFeedback.textContent = "Informe a matrícula para salvar uma jornada."; scheduleRegistrationInput.focus(); return; }
     let target = Number(schedulePreset.value);
@@ -1654,11 +1919,24 @@
     schedules[key] = target;
     if (!persistSchedules()) return;
     renderRecords(); updateDurationPreview(); refreshScheduleForm();
-    scheduleFeedback.textContent = "Jornada de "+formatTarget(target)+" salva para a matrícula "+key+". Cálculos e relatórios atualizados.";
+    if (cloudConnected) {
+      try {
+        await syncScheduleToCloud(key, target);
+        scheduleFeedback.textContent = "Jornada de "+formatTarget(target)+" salva localmente e no banco central para a matrícula "+key+".";
+      } catch (error) {
+        scheduleFeedback.textContent = "Jornada salva localmente, mas não sincronizada: "+error.message+". Use Enviar dados locais para o banco.";
+      }
+    } else {
+      scheduleFeedback.textContent = "Jornada de "+formatTarget(target)+" salva para a matrícula "+key+" neste navegador.";
+    }
   });
-  document.getElementById("resetScheduleButton").addEventListener("click", () => {
+  document.getElementById("resetScheduleButton").addEventListener("click", async () => {
     const key = normalizeRegistration(scheduleRegistrationInput.value);
     if (!key) { scheduleFeedback.textContent = "Informe a matrícula para restaurar o padrão."; return; }
+    if (cloudConnected) {
+      try { await SheetsBackend.request("deleteSchedule", { registration: key }); }
+      catch (error) { scheduleFeedback.textContent = "Não foi possível remover a jornada no banco central: " + error.message; return; }
+    }
     delete schedules[key];
     if (!persistSchedules()) return;
     renderRecords(); updateDurationPreview(); refreshScheduleForm();
@@ -1710,12 +1988,16 @@
     event.target.value = event.target.value.trim().toUpperCase();
   });
 
-  recordsBody.addEventListener("click", (event) => {
+  recordsBody.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-delete-id]");
     if (!button) return;
     const record = records.find((item) => item.id === button.dataset.deleteId);
     if (!record) return;
     if (!window.confirm("Deseja excluir o lançamento de " + (record.fullName || "colaborador") + "?")) return;
+    if (cloudConnected) {
+      try { await SheetsBackend.request("deleteRecord", { id: record.id }); }
+      catch (error) { showFeedback("Não foi possível excluir o lançamento do banco central: " + error.message, "error"); return; }
+    }
     records = records.filter((item) => item.id !== button.dataset.deleteId);
     if (persistRecords()) {
       renderRecords();
@@ -1747,11 +2029,40 @@
   document.getElementById("exportBackupButton").addEventListener("click", exportBackup);
   document.getElementById("importBackupButton").addEventListener("click", () => document.getElementById("backupFileInput").click());
   document.getElementById("backupFileInput").addEventListener("change", importBackup);
+  document.getElementById("connectCloudButton").addEventListener("click", () => connectCloudDatabase(false));
+  refreshCloudButton.addEventListener("click", async () => {
+    try {
+      updateCloudStatus("Atualizando dados do banco central...", "");
+      const counts = await refreshCloudDatabase();
+      updateCloudStatus("Atualização concluída: " + counts.records + " lançamentos, " + counts.schedules + " jornadas e " + counts.shifts + " escalas recebidos.", "success");
+    } catch (error) {
+      updateCloudStatus("Falha ao atualizar o banco central: " + error.message, "error");
+    }
+  });
+  syncLocalDataButton.addEventListener("click", sendLocalDataToCloud);
+  document.getElementById("disconnectCloudButton").addEventListener("click", () => {
+    if (window.SheetsBackend) SheetsBackend.clearAccessCode();
+    cloudConnected = false;
+    refreshCloudButton.disabled = true;
+    syncLocalDataButton.disabled = true;
+    cloudAccessCodeInput.value = "";
+    updateCloudStatus("Código removido desta sessão. Os dados locais continuam disponíveis neste navegador.", "");
+  });
+  cloudBackupFileInput.addEventListener("change", selectCloudBackup);
+  importCloudBackupButton.addEventListener("click", importCloudBackup);
   exportButton.addEventListener("click", exportExcel);
   exportCsvButton.addEventListener("click", exportCsv);
   printButton.addEventListener("click", () => window.print());
 
   document.getElementById("todayLabel").textContent = formatLongDate(new Date());
+  if (window.SheetsBackend) {
+    cloudEndpointInput.value = SheetsBackend.getEndpoint();
+    if (SheetsBackend.isConfigured()) {
+      connectCloudDatabase(true);
+    } else {
+      updateCloudStatus("Banco central não conectado. Os registros continuam sendo salvos localmente. Configure a URL e o código de acesso para conectar.", "");
+    }
+  }
   refreshScheduleForm();
   startDateInput.value = localDateString();
   endDateInput.value = localDateString();
