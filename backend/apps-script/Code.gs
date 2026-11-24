@@ -107,7 +107,7 @@ function dispatch_(request) {
   if (action === "logout") return logout_(request.sessionToken);
   const session = getSession_(request.sessionToken);
   const user = session.user;
-  if (user.mustChange && action !== "changePassword") throw apiError_("PASSWORD_CHANGE_REQUIRED", "Altere sua senha temporária antes de continuar.");
+  if (user.mustChange && !["changePassword", "me", "logout"].includes(action)) throw apiError_("PASSWORD_CHANGE_REQUIRED", "Altere sua senha temporária antes de continuar.");
   switch (action) {
     case "ping": return ping_(user);
     case "getAll": return getAll_(user);
