@@ -740,3 +740,49 @@ button:focus-visible,.dashboard-action:focus-visible,.side-nav-link:focus-visibl
   .cloud-db-import-controls { grid-template-columns: 1fr; }
   .cloud-db-import-controls button { width: 100%; }
 }
+
+
+/* Autenticação individual e administração */
+body.auth-required .app-shell { display: none !important; }
+body.auth-ready #authScreen { display: none !important; }
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 18px;
+  background: #f3f6fb;
+}
+.auth-card {
+  width: min(100%, 440px);
+  padding: 34px;
+  border: 1px solid #dce4ef;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(20, 42, 75, .10);
+}
+.auth-card h1 { margin: 12px 0 8px; color: #17263d; font-size: 27px; }
+.auth-card > p { color: #66758c; line-height: 1.55; }
+.auth-card form { display: grid; gap: 16px; margin-top: 24px; }
+.auth-card .button { width: 100%; min-height: 48px; }
+.auth-feedback { min-height: 22px; margin: 16px 0 0; color: #64748b; font-size: 13px; }
+.auth-feedback.is-error { color: #b42318; }
+.account-summary { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; padding: 14px 0 20px; }
+.account-summary strong { color:#17263d; font-size:18px; }
+.account-summary span { color:#64748b; font-size:13px; }
+.password-change-form { border-top:1px solid #e5eaf2; padding-top:20px; display:grid; gap:12px; }
+.password-change-form h3, .admin-users-panel h3 { margin:0; color:#17263d; }
+.password-change-form p, .admin-users-panel > p { margin:0; color:#64748b; font-size:13px; line-height:1.5; }
+.password-change-form.password-change-required { border:1px solid #f3d18c; border-radius:12px; padding:18px; background:#fffaf0; }
+.admin-users-panel { display:grid; gap:14px; margin-bottom:24px; }
+.admin-users-list { display:grid; gap:10px; }
+.admin-user-row { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:13px 14px; border:1px solid #e1e7f0; border-radius:12px; }
+.admin-user-row strong, .admin-user-row small { display:block; }
+.admin-user-row small { margin-top:4px; color:#64748b; }
+.admin-user-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.admin-user-actions .button { padding:8px 10px; min-height:34px; font-size:12px; }
+input[readonly] { background:#f4f6f9 !important; color:#617086; cursor:not-allowed; }
+@media (max-width: 620px) {
+  .auth-card { padding:25px 20px; }
+  .admin-user-row { align-items:flex-start; flex-direction:column; }
+}
