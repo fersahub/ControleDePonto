@@ -516,3 +516,346 @@ button:focus-visible,.dashboard-action:focus-visible,.side-nav-link:focus-visibl
 @media(max-width:1150px){.dashboard-pulse-grid{grid-template-columns:1fr}.activity-layout{grid-template-columns:1fr}}
 @media(max-width:760px){.dashboard-panel{padding:17px 15px 14px}.activity-panel{padding:18px 14px}.activity-calendar-card,.activity-day-card{padding:13px 11px}.activity-day,.activity-calendar-blank{min-height:56px}.activity-day{padding:6px 5px}.activity-day-status{font-size:6px}.activity-toolbar .field{flex:1 1 190px}}
 @media(max-width:460px){.dashboard-month-metrics{grid-template-columns:1fr 1fr}.dashboard-month-metrics>div:first-child{grid-column:1/-1}.dashboard-month-metrics strong{font-size:16px}.activity-toolbar{padding:10px}.activity-weekdays,.activity-calendar-grid{gap:4px}.activity-day,.activity-calendar-blank{min-height:49px}.activity-day-number{font-size:10px}.activity-calendar-legend{gap:7px 9px;font-size:7px}.activity-day-summary{grid-template-columns:1fr 1fr}.activity-day-summary>div:last-child{grid-column:1/-1}.activity-timeline-entry{grid-template-columns:55px 8px minmax(0,1fr);gap:6px}.activity-event-content{padding:9px}}
+
+
+/* Ajustes finais de alinhamento, largura e comportamento responsivo */
+.app-shell,
+.app-shell > *,
+main,
+main > *,
+.panel,
+.dashboard-panel,
+.activity-calendar-card,
+.activity-day-card {
+  min-width: 0;
+}
+.panel-heading {
+  align-items: flex-start;
+}
+.panel-title-wrap,
+.panel-title-wrap > div {
+  min-width: 0;
+}
+.panel-title-wrap {
+  flex: 1 1 auto;
+}
+.panel-title-wrap h2,
+.panel-title-wrap p,
+.panel-heading h2,
+.panel-heading p {
+  overflow-wrap: anywhere;
+}
+.required-note,
+.planner-mode-label {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+.form-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.form-grid > .field,
+.schedule-controls > .field,
+.shift-planner-form > .field,
+.individual-controls > .field {
+  min-width: 0;
+}
+.field input,
+.field select,
+.field textarea,
+.schedule-controls input,
+.schedule-controls select,
+.shift-planner-form input,
+.shift-planner-form select,
+.shift-saved-controls select,
+.shift-calendar-controls input,
+.shift-calendar-controls select,
+.activity-toolbar input,
+.activity-toolbar select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.admin-users-panel .form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+}
+.admin-users-panel .form-grid .field-span-2 {
+  grid-column: 1 / -1;
+}
+.admin-users-panel .form-grid .button {
+  width: 100%;
+}
+.password-change-form .form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.password-change-form > .button {
+  justify-self: start;
+  min-width: 190px;
+}
+.form-actions,
+.records-actions,
+.cloud-db-actions,
+.schedule-actions,
+.shift-planner-actions {
+  min-width: 0;
+}
+.form-actions,
+.records-actions {
+  flex-wrap: wrap;
+}
+.button,
+.dashboard-action {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+.cloud-db-import-controls {
+  grid-template-columns: minmax(0, 1fr) minmax(190px, auto);
+}
+.cloud-db-import-controls .field {
+  min-width: 0;
+}
+.cloud-db-import-controls input[type="file"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 40px;
+  padding: 8px;
+}
+.admin-user-row {
+  min-width: 0;
+}
+.admin-user-row > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-user-actions {
+  flex: 0 0 auto;
+}
+.table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.table-wrap table {
+  width: 100%;
+}
+.individual-controls .field,
+.individual-actions {
+  min-width: 0;
+}
+@media (max-width: 1050px) {
+  .password-change-form .form-grid,
+  .admin-users-panel .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-users-panel .form-grid .field-span-2 {
+    grid-column: 1 / -1;
+  }
+  .cloud-db-import-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(170px, auto);
+  }
+}
+@media (max-width: 760px) {
+  .panel-heading {
+    gap: 12px;
+  }
+  .panel-title-wrap {
+    gap: 10px;
+  }
+  .schedule-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .schedule-actions {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+  .schedule-actions .button {
+    flex: 1 1 160px;
+  }
+  .shift-planner-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shift-planner-actions {
+    grid-column: 1 / -1;
+  }
+  .individual-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .individual-actions {
+    grid-column: 1 / -1;
+  }
+  .individual-actions .button {
+    width: 100%;
+  }
+  .cloud-db-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cloud-db-actions .button {
+    width: 100%;
+  }
+}
+@media (max-width: 620px) {
+  .password-change-form .form-grid,
+  .admin-users-panel .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-users-panel .form-grid .field-span-2 {
+    grid-column: auto;
+  }
+  .password-change-form > .button {
+    width: 100%;
+    justify-self: stretch;
+  }
+  .cloud-db-import-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cloud-db-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-user-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .admin-user-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-user-actions .button {
+    width: 100%;
+  }
+  .records-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-self: stretch;
+  }
+  .records-actions .button {
+    width: 100%;
+  }
+}
+@media (max-width: 560px) {
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .field-span-2 {
+    grid-column: auto;
+  }
+  .schedule-controls,
+  .shift-planner-form,
+  .individual-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .schedule-actions,
+  .shift-planner-actions,
+  .individual-actions {
+    grid-column: auto;
+  }
+  .schedule-actions,
+  .shift-planner-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .schedule-actions .button,
+  .shift-planner-actions .button {
+    width: 100%;
+  }
+  .individual-actions .button {
+    width: 100%;
+  }
+  .panel-heading {
+    flex-wrap: wrap;
+  }
+  .required-note,
+  .planner-mode-label {
+    margin-left: 39px;
+  }
+  .side-nav-link {
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.15;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  .topbar {
+    gap: 8px;
+  }
+  .topbar-meta {
+    max-width: 42%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-toolbar .field {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .activity-calendar-card,
+  .activity-day-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .activity-weekdays,
+  .activity-calendar-grid {
+    gap: 3px;
+  }
+  .activity-day,
+  .activity-calendar-blank {
+    min-height: 45px;
+  }
+  .activity-day {
+    padding: 5px 4px;
+  }
+  .activity-day-status {
+    font-size: 6px;
+  }
+}
+@media (max-width: 380px) {
+  .app-shell {
+    width: calc(100% - 18px);
+  }
+  .side-nav {
+    gap: 4px;
+    padding: 6px;
+  }
+  .side-nav-link {
+    flex-basis: calc(50% - 4px);
+    min-height: 36px;
+    padding-inline: 7px;
+    font-size: 8px;
+  }
+  .topbar-meta {
+    padding: 6px 7px;
+    font-size: 8px;
+  }
+  .panel-heading {
+    gap: 9px;
+  }
+  .panel-title-wrap {
+    gap: 8px;
+  }
+  .form-panel,
+  .records-panel,
+  .individual-panel,
+  .schedule-panel,
+  .shift-planner-panel,
+  .cloud-db-panel {
+    padding-inline: 12px;
+  }
+  .activity-day-number {
+    font-size: 9px;
+  }
+  .activity-calendar-legend {
+    font-size: 7px;
+  }
+}
