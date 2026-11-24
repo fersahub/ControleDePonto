@@ -1989,6 +1989,10 @@
     window.setTimeout(() => {
       startDateInput.value = localDateString();
       endDateInput.value = localDateString();
+      if (currentUser && currentUser.role === "employee") {
+        document.getElementById("fullName").value = currentUser.fullName;
+        document.getElementById("registration").value = currentUser.registration;
+      }
       clearFeedback();
       toggleRouteFields();
       updateDurationPreview();
