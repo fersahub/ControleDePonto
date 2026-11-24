@@ -59,6 +59,8 @@ async function run() {
     await page.goto(url, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#timeForm", { state: "attached" });
     await page.waitForSelector("body.auth-ready");
+    const initialTabs = await page.evaluate(() => ({ overview: !document.querySelector("#tab-overview").hidden, journey: !document.querySelector("#tab-journey").hidden, newRecord: !document.querySelector("#tab-new-record").hidden }));
+    check(initialTabs.overview && !initialTabs.journey && !initialTabs.newRecord, "Somente a aba Visão geral fica aberta inicialmente: " + JSON.stringify(initialTabs));
     check(await page.title() === "Meu Controle de Jornada", "Título da versão pessoal");
     check(await page.locator("#schedulePreset").count() === 1, "Seção de jornada personalizada visível");
     check(await page.evaluate(() => !!window.TimeEngine), "Motor de cálculo carregado antes do app");
@@ -99,6 +101,7 @@ async function run() {
 
 
     await page.locator(".side-nav a[href='#scheduleTitle']").click();
+    check(await page.locator("#tab-journey").isVisible() && !(await page.locator("#tab-overview").isVisible()), "Aba Minha jornada oculta as demais áreas");
 
     // Custom daily target and a shift with deducted break.
     await page.locator("#scheduleRegistration").fill("TESTE-001");
@@ -141,6 +144,7 @@ async function run() {
     check((await page.locator("#activityCalendarNote").textContent()).includes("integrada ao calendário"), "Calendário informa integração da escala");
     check(JSON.stringify(sixOnePlanner.kinds) === JSON.stringify(["work","work","work","work","work","work","rest"]), "Calendário projeta o ciclo 6x1");
 
+    await page.locator(".side-nav a[href='#shiftPlannerPanel']").click();
     await page.locator("#shiftScheduleRegistration").fill("PLAN-12");
     await page.locator("#shiftScheduleType").selectOption("12x36");
     await page.locator("#shiftAnchorDate").fill("2026-11-10");
