@@ -581,11 +581,13 @@ function enforceRateLimit_() {
   cache.put(key, String(n), 60);
 }
 function randomSecret_() { return Utilities.getUuid().replace(/-/g,"") + Utilities.getUuid().replace(/-/g,""); }
-function digest_(s) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)); }
+function digest_(s) { return bytesToHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)); }
 function passwordHash_(password, salt) {
   const pepper = PropertiesService.getScriptProperties().getProperty(CP.pepperProperty);
   if (!pepper) throw apiError_("NOT_INITIALIZED", "Execute setupControleDePonto() para inicializar o backend.");
-  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(String(password) + "|" + salt, pepper, Utilities.Charset.UTF_8));
+  return bytesToHex_(Utilities.computeHmacSha256Signature(String(password) + "|" + salt, pepper, Utilities.Charset.UTF_8));
+}
+function bytesToHex_(bytes) { return bytes.map(value => ("0" + (value & 255).toString(16)).slice(-2)).join(""); }
 }
 function constantTimeEquals_(a,b) { a=String(a || ""); b=String(b || ""); if (a.length !== b.length) return false; let diff=0; for (let i=0;i<a.length;i++) diff |= a.charCodeAt(i)^b.charCodeAt(i); return diff===0; }
 function validateOrigin_(origin) {
