@@ -1,9 +1,14 @@
 "use strict";
 
 (() => {
-  const STORAGE_KEY = "controleDePonto.registros.v1";
-  const SCHEDULES_KEY = "controleDePonto.jornadas.v1";
-  const SHIFT_PLANS_KEY = "controleDePonto.escalas.v1";
+  const bootUser = window.SheetsBackend ? SheetsBackend.getCachedUser() : null;
+  const storageScope = bootUser && bootUser.id ? bootUser.id : "anonymous";
+  const LEGACY_STORAGE_KEY = "controleDePonto.registros.v1";
+  const LEGACY_SCHEDULES_KEY = "controleDePonto.jornadas.v1";
+  const LEGACY_SHIFT_PLANS_KEY = "controleDePonto.escalas.v1";
+  const STORAGE_KEY = "controleDePonto.registros.v2." + storageScope;
+  const SCHEDULES_KEY = "controleDePonto.jornadas.v2." + storageScope;
+  const SHIFT_PLANS_KEY = "controleDePonto.escalas.v2." + storageScope;
   const CONTRACT_MINUTES = 7 * 60 + 20;
   const scheduleRegistrationInput = document.getElementById("scheduleRegistration");
   const schedulePreset = document.getElementById("schedulePreset");
@@ -35,9 +40,16 @@
   const activityCalendarGrid = document.getElementById("activityCalendarGrid");
   let activitySelectedDate = "";
 
-  const cloudEndpointInput = document.getElementById("cloudEndpoint");
-  const cloudAccessCodeInput = document.getElementById("cloudAccessCode");
   const cloudDbStatus = document.getElementById("cloudDbStatus");
+  const loginForm = document.getElementById("loginForm");
+  const loginUsername = document.getElementById("loginUsername");
+  const loginPassword = document.getElementById("loginPassword");
+  const authFeedback = document.getElementById("authFeedback");
+  const accountName = document.getElementById("accountName");
+  const accountDetails = document.getElementById("accountDetails");
+  const accountRole = document.getElementById("accountRole");
+  const topbarUserName = document.getElementById("topbarUserName");
+  let currentUser = bootUser;
   const refreshCloudButton = document.getElementById("refreshCloudButton");
   const syncLocalDataButton = document.getElementById("syncLocalDataButton");
   const cloudBackupFileInput = document.getElementById("cloudBackupFileInput");
@@ -50,7 +62,7 @@
 
   function loadRecords() {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) || (bootUser && bootUser.role === "admin" ? localStorage.getItem(LEGACY_STORAGE_KEY) : null);
       const parsed = saved ? JSON.parse(saved) : [];
       return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === "object") : [];
     } catch (error) {
@@ -61,7 +73,7 @@
 
   function loadSchedules() {
     try {
-      const value = JSON.parse(localStorage.getItem(SCHEDULES_KEY) || "{}");
+      const value = JSON.parse(localStorage.getItem(SCHEDULES_KEY) || (bootUser && bootUser.role === "admin" ? localStorage.getItem(LEGACY_SCHEDULES_KEY) : null) || "{}");
       return value && typeof value === "object" && !Array.isArray(value) ? value : {};
     } catch (error) { console.warn("Falha ao ler jornadas.", error); return {}; }
   }
@@ -72,7 +84,7 @@
 
   function loadShiftPlans() {
     try {
-      const parsed = JSON.parse(localStorage.getItem(SHIFT_PLANS_KEY) || "{}");
+      const parsed = JSON.parse(localStorage.getItem(SHIFT_PLANS_KEY) || (bootUser && bootUser.role === "admin" ? localStorage.getItem(LEGACY_SHIFT_PLANS_KEY) : null) || "{}");
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
       const valid = {};
       Object.entries(parsed).forEach(([registration, value]) => {
@@ -497,35 +509,101 @@
     return { records: data.records.length, schedules: Object.keys(data.schedules || {}).length, shifts: Object.keys(data.shiftSchedules || {}).length };
   }
 
+  function applyAuthenticatedUser(user) {
+    currentUser = user;
+    const isAdmin = user.role === "admin";
+    accountName.textContent = user.fullName || user.username;
+    accountDetails.textContent = user.registration ? "Matrícula: " + user.registration + " · Usuário: " + user.username : "Usuário: " + user.username;
+    accountRole.textContent = isAdmin ? "Administrador" : "Funcionário";
+    topbarUserName.textContent = (user.fullName || user.username) + (isAdmin ? " · Administrador" : "");
+    document.querySelectorAll(".admin-only").forEach((element) => { element.classList.toggle("is-hidden", !isAdmin); });
+    document.getElementById("fullName").readOnly = !isAdmin;
+    document.getElementById("registration").readOnly = !isAdmin;
+    scheduleRegistrationInput.readOnly = !isAdmin;
+    document.getElementById("shiftScheduleRegistration").readOnly = !isAdmin;
+    if (!isAdmin) {
+      document.getElementById("fullName").value = user.fullName;
+      document.getElementById("registration").value = user.registration;
+      scheduleRegistrationInput.value = user.registration;
+      document.getElementById("shiftScheduleRegistration").value = user.registration;
+      refreshScheduleForm();
+      renderShiftCalendar();
+    }
+    document.getElementById("passwordChangeHint").textContent = user.mustChange
+      ? "Esta é uma senha temporária. Você precisa criar uma senha pessoal antes de continuar."
+      : "Use uma senha pessoal com pelo menos 10 caracteres.";
+    document.getElementById("changePasswordForm").classList.toggle("password-change-required", Boolean(user.mustChange));
+  }
+
   async function connectCloudDatabase(automatic) {
     try {
-      if (!window.SheetsBackend) throw new Error("O módulo de conexão com Google Sheets não foi carregado.");
-      if (automatic) {
-        if (!SheetsBackend.isConfigured()) return;
-      } else {
-        SheetsBackend.configure(cloudEndpointInput.value, cloudAccessCodeInput.value);
+      if (!window.SheetsBackend) throw new Error("O módulo de autenticação não foi carregado.");
+      const user = await SheetsBackend.resume();
+      applyAuthenticatedUser(user);
+      document.body.classList.add("auth-ready");
+      document.body.classList.remove("auth-required");
+      if (user.mustChange) {
+        cloudConnected = false;
+        updateCloudStatus("Altere sua senha temporária para liberar o sistema.", "error");
+        refreshCloudButton.disabled = true;
+        syncLocalDataButton.disabled = true;
+        return true;
       }
-      updateCloudStatus("Verificando a conexão com o Google Apps Script...", "");
+      updateCloudStatus("Validando sua sessão e conectando ao banco central...", "");
       const ping = await SheetsBackend.request("ping", {});
-      if (!ping || !ping.connected) throw new Error("O backend respondeu, mas não confirmou a conexão com a planilha.");
+      if (!ping || !ping.connected) throw new Error("O backend não confirmou a conexão com a planilha.");
       cloudConnected = true;
-      refreshCloudButton.disabled = false;
-      syncLocalDataButton.disabled = false;
+      refreshCloudButton.disabled = user.role !== "admin";
+      syncLocalDataButton.disabled = user.role !== "admin";
       const counts = await refreshCloudDatabase();
-      updateCloudStatus(
-        "Conectado ao banco central. " + counts.records + " lançamentos, " +
-        counts.schedules + " jornadas e " + counts.shifts + " escalas recebidos. " +
-        "Os dados locais ainda não enviados podem ser transferidos pelos botões abaixo.",
-        "success"
-      );
-      cloudEndpointInput.value = SheetsBackend.getEndpoint();
+      updateCloudStatus("Conectado. " + counts.records + " lançamentos, " + counts.schedules + " jornadas e " + counts.shifts + " escalas carregados para esta conta.", "success");
+      if (user.role === "admin") await loadAdminUsers();
       return true;
     } catch (error) {
       cloudConnected = false;
-      refreshCloudButton.disabled = true;
-      syncLocalDataButton.disabled = true;
-      updateCloudStatus(error.message || "Não foi possível conectar ao banco central.", "error");
+      SheetsBackend.clearSession();
+      document.body.classList.remove("auth-ready");
+      document.body.classList.add("auth-required");
+      if (authFeedback) authFeedback.textContent = error.message || "Não foi possível validar seu acesso.";
+      if (refreshCloudButton) refreshCloudButton.disabled = true;
+      if (syncLocalDataButton) syncLocalDataButton.disabled = true;
       return false;
+    }
+  }
+
+  async function loadAdminUsers() {
+    if (!currentUser || currentUser.role !== "admin") return;
+    const list = document.getElementById("adminUsersList");
+    try {
+      const users = await SheetsBackend.request("listUsers", {});
+      list.replaceChildren();
+      if (!users.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "Nenhum funcionário cadastrado.";
+        list.append(empty);
+        return;
+      }
+      users.forEach((user) => {
+        const row = document.createElement("div");
+        row.className = "admin-user-row";
+        const details = document.createElement("div");
+        const name = document.createElement("strong");
+        name.textContent = user.fullName;
+        const meta = document.createElement("small");
+        meta.textContent = "Matrícula " + user.registration + " · usuário " + user.username + (user.active ? " · Ativo" : " · Desativado");
+        details.append(name, meta);
+        const actions = document.createElement("div");
+        actions.className = "admin-user-actions";
+        const reset = document.createElement("button");
+        reset.type = "button"; reset.className = "button button-quiet"; reset.dataset.resetUser = user.id; reset.textContent = "Redefinir senha";
+        const toggle = document.createElement("button");
+        toggle.type = "button"; toggle.className = "button button-quiet"; toggle.dataset.toggleUser = user.id; toggle.dataset.active = user.active ? "true" : "false"; toggle.textContent = user.active ? "Desativar" : "Reativar";
+        actions.append(reset, toggle);
+        row.append(details, actions);
+        list.append(row);
+      });
+    } catch (error) {
+      list.textContent = "Não foi possível carregar as contas: " + error.message;
     }
   }
 
@@ -2029,25 +2107,78 @@
   document.getElementById("exportBackupButton").addEventListener("click", exportBackup);
   document.getElementById("importBackupButton").addEventListener("click", () => document.getElementById("backupFileInput").click());
   document.getElementById("backupFileInput").addEventListener("change", importBackup);
-  document.getElementById("connectCloudButton").addEventListener("click", () => connectCloudDatabase(false));
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    authFeedback.textContent = "Validando acesso...";
+    document.getElementById("loginButton").disabled = true;
+    try {
+      await SheetsBackend.login(loginUsername.value, loginPassword.value);
+      window.location.reload();
+    } catch (error) {
+      authFeedback.textContent = error.message || "Não foi possível entrar.";
+      document.getElementById("loginButton").disabled = false;
+      loginPassword.value = "";
+    }
+  });
+  document.getElementById("logoutButton").addEventListener("click", async () => {
+    try { await SheetsBackend.logout(); } catch (_) { SheetsBackend.clearSession(); }
+    window.location.reload();
+  });
+  document.getElementById("changePasswordForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const current = document.getElementById("currentPassword").value;
+    const next = document.getElementById("newPassword").value;
+    const confirm = document.getElementById("confirmPassword").value;
+    const feedback = document.getElementById("passwordChangeFeedback");
+    if (next.length < 10) { feedback.textContent = "A nova senha deve ter pelo menos 10 caracteres."; return; }
+    if (next !== confirm) { feedback.textContent = "A confirmação não corresponde à nova senha."; return; }
+    try {
+      await SheetsBackend.request("changePassword", { currentPassword: current, newPassword: next });
+      feedback.textContent = "Senha alterada. Atualizando sua sessão...";
+      await connectCloudDatabase(true);
+    } catch (error) { feedback.textContent = error.message; }
+  });
+  document.getElementById("createUserForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const feedback = document.getElementById("adminUserFeedback");
+    const submit = document.getElementById("createUserButton");
+    submit.disabled = true;
+    try {
+      const result = await SheetsBackend.request("createUser", {
+        fullName: document.getElementById("newUserName").value,
+        registration: document.getElementById("newUserRegistration").value,
+        username: document.getElementById("newUsername").value
+      });
+      feedback.textContent = "Conta criada para " + result.user.fullName + ". Usuário: " + result.user.username + " · Senha temporária: " + result.temporaryPassword + " · Entregue diretamente ao funcionário. Ela será solicitada apenas no primeiro acesso.";
+      event.target.reset();
+      await loadAdminUsers();
+    } catch (error) { feedback.textContent = error.message; }
+    finally { submit.disabled = false; }
+  });
+  document.getElementById("adminUsersList").addEventListener("click", async (event) => {
+    const reset = event.target.closest("[data-reset-user]");
+    const toggle = event.target.closest("[data-toggle-user]");
+    const feedback = document.getElementById("adminUserFeedback");
+    try {
+      if (reset) {
+        const result = await SheetsBackend.request("resetUserPassword", { userId: reset.dataset.resetUser });
+        feedback.textContent = "Nova senha temporária: " + result.temporaryPassword + ". Entregue diretamente ao funcionário; as sessões anteriores foram encerradas.";
+      } else if (toggle) {
+        const active = toggle.dataset.active !== "true";
+        await SheetsBackend.request("setUserActive", { userId: toggle.dataset.toggleUser, active: active });
+        feedback.textContent = active ? "Conta reativada." : "Conta desativada e sessões encerradas.";
+        await loadAdminUsers();
+      }
+    } catch (error) { feedback.textContent = error.message; }
+  });
   refreshCloudButton.addEventListener("click", async () => {
     try {
       updateCloudStatus("Atualizando dados do banco central...", "");
       const counts = await refreshCloudDatabase();
-      updateCloudStatus("Atualização concluída: " + counts.records + " lançamentos, " + counts.schedules + " jornadas e " + counts.shifts + " escalas recebidos.", "success");
-    } catch (error) {
-      updateCloudStatus("Falha ao atualizar o banco central: " + error.message, "error");
-    }
+      updateCloudStatus("Atualização concluída: " + counts.records + " lançamentos, " + counts.schedules + " jornadas e " + counts.shifts + " escalas.", "success");
+    } catch (error) { updateCloudStatus("Falha ao atualizar o banco central: " + error.message, "error"); }
   });
   syncLocalDataButton.addEventListener("click", sendLocalDataToCloud);
-  document.getElementById("disconnectCloudButton").addEventListener("click", () => {
-    if (window.SheetsBackend) SheetsBackend.clearAccessCode();
-    cloudConnected = false;
-    refreshCloudButton.disabled = true;
-    syncLocalDataButton.disabled = true;
-    cloudAccessCodeInput.value = "";
-    updateCloudStatus("Código removido desta sessão. Os dados locais continuam disponíveis neste navegador.", "");
-  });
   cloudBackupFileInput.addEventListener("change", selectCloudBackup);
   importCloudBackupButton.addEventListener("click", importCloudBackup);
   exportButton.addEventListener("click", exportExcel);
@@ -2055,13 +2186,14 @@
   printButton.addEventListener("click", () => window.print());
 
   document.getElementById("todayLabel").textContent = formatLongDate(new Date());
-  if (window.SheetsBackend) {
-    cloudEndpointInput.value = SheetsBackend.getEndpoint();
-    if (SheetsBackend.isConfigured()) {
-      connectCloudDatabase(true);
-    } else {
-      updateCloudStatus("Banco central não conectado. Os registros continuam sendo salvos localmente. Configure a URL e o código de acesso para conectar.", "");
-    }
+  if (window.SheetsBackend && SheetsBackend.hasSession()) {
+    connectCloudDatabase(true);
+  } else {
+    document.body.classList.add("auth-required");
+    document.body.classList.remove("auth-ready");
+    if (authFeedback) authFeedback.textContent = SheetsBackend && SheetsBackend.getEndpoint()
+      ? "Informe seu usuário e senha para entrar."
+      : "O endereço central ainda precisa ser configurado pelo administrador.";
   }
   refreshScheduleForm();
   startDateInput.value = localDateString();
