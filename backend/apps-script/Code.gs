@@ -185,14 +185,16 @@ function createEmployee_(data) {
   if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw apiError_("INVALID_USERNAME", "O usuário deve ter de 3 a 40 caracteres: letras, números, ponto, hífen ou sublinhado.");
   if (fullName.length < 3 || fullName.length > 120) throw apiError_("INVALID_NAME", "Informe o nome completo do funcionário.");
   if (!registration || registration.length > 30) throw apiError_("INVALID_REGISTRATION", "Informe uma matrícula válida.");
-  const users = readUsers_();
-  if (users.some(u => u.username === username)) throw apiError_("USERNAME_EXISTS", "Este nome de usuário já está cadastrado.");
-  if (users.some(u => u.role === "employee" && u.registration === registration)) throw apiError_("REGISTRATION_EXISTS", "Esta matrícula já está vinculada a outra conta.");
-  const password = randomSecret_().slice(0, 20) + "aA9!";
-  const user = { id: "usr-" + Utilities.getUuid(), username: username, fullName: fullName, registration: registration, role: "employee", password: password, active: true, mustChange: true };
-  createUserRow_(user);
-  assignLegacyDataToUser_(registration, user.id);
-  return { user: publicUser_(user), temporaryPassword: password };
+  return withWriteLock_(function() {
+    const users = readUsers_();
+    if (users.some(u => u.username === username)) throw apiError_("USERNAME_EXISTS", "Este nome de usuário já está cadastrado.");
+    if (users.some(u => u.role === "employee" && u.registration === registration)) throw apiError_("REGISTRATION_EXISTS", "Esta matrícula já está vinculada a outra conta.");
+    const password = randomSecret_().slice(0, 20) + "aA9!";
+    const user = { id: "usr-" + Utilities.getUuid(), username: username, fullName: fullName, registration: registration, role: "employee", password: password, active: true, mustChange: true };
+    createUserRow_(user);
+    assignLegacyDataToUser_(registration, user.id);
+    return { user: publicUser_(user), temporaryPassword: password };
+  });
 }
 
 function resetUserPassword_(userId) {
@@ -204,13 +206,15 @@ function resetUserPassword_(userId) {
 }
 
 function setUserActive_(userId, active) {
-  const user = readUsers_().find(u => u.id === String(userId || "") && u.role !== "admin");
-  if (!user) throw apiError_("USER_NOT_FOUND", "Funcionário não encontrado.");
-  const sheet = getSheet_(CP.sheets.users);
-  const row = findRowByKey_(sheet, 1, user.id);
-  sheet.getRange(row, 8).setValue(active ? "SIM" : "NAO");
-  if (!active) revokeUserSessions_(user.id);
-  return { userId: user.id, active: active };
+  return withWriteLock_(function() {
+    const user = readUsers_().find(u => u.id === String(userId || "") && u.role !== "admin");
+    if (!user) throw apiError_("USER_NOT_FOUND", "Funcionário não encontrado.");
+    const sheet = getSheet_(CP.sheets.users);
+    const row = findRowByKey_(sheet, 1, user.id);
+    sheet.getRange(row, 8).setValue(active ? "SIM" : "NAO");
+    if (!active) revokeUserSessions_(user.id);
+    return { userId: user.id, active: active };
+  });
 }
 
 function changePassword_(user, currentPassword, newPassword) {
@@ -238,6 +242,7 @@ function updateUserPassword_(userId, password, mustChange, revokeSessions) {
 
 function assignLegacyDataToUser_(registration, userId) {
   const key = normalizeRegistration_(registration);
+  const adminId = (readUsers_().find(u => u.role === "admin") || {}).id || "";
   [ [CP.sheets.records, 16], [CP.sheets.schedules, 4], [CP.sheets.shifts, 10] ].forEach(([name, col]) => {
     const sheet = getSheet_(name);
     if (sheet.getLastRow() < 2) return;
@@ -245,7 +250,7 @@ function assignLegacyDataToUser_(registration, userId) {
     rows.forEach((row, index) => {
       try {
         const item = JSON.parse(String(row[col - 1] || "{}"));
-        if (normalizeRegistration_(item.registration) === key && !item.ownerId) {
+        if (normalizeRegistration_(item.registration) === key && (!item.ownerId || item.ownerId === adminId)) {
           item.ownerId = userId;
           sheet.getRange(index + 2, col).setValue(JSON.stringify(item));
         }
