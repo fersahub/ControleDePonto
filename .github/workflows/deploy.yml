@@ -34,6 +34,7 @@ jobs:
         run: |
           node --check assets/js/time-engine.js
           node --check assets/js/schedule-engine.js
+          node --check assets/js/backend-config.js
           node --check assets/js/sheets-client.js
           node --check assets/js/app.js
           node --check < backend/apps-script/Code.gs
